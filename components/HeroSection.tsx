@@ -82,7 +82,7 @@ const HeroSection = () => {
             <div className="absolute inset-0 bg-black bg-opacity-10 md:bg-opacity-50 from-black/100 via-black/75 to-black/0 bg-gradient-to-r left-0"></div>
 
             {/* Logo, Company Name, and Slogan */}
-            <div className="relative text-white z-10 p-6 flex flex-col items-start justify-start w-full">
+            <div className="relative text-white z-10 p-6 flex flex-col text-center md:text-left md:items-start justify-center md:justify-start w-full">
                 <h1
                     className="text-xl md:text-3xl lg:text-6xl font-bold mb-2 md:mb-4 lg:mb-10"
                     style={{
@@ -94,7 +94,7 @@ const HeroSection = () => {
                     TWILIGHT LUXE CREATIONS
                 </h1> {/* White with golden shadow for the company name */}
 
-                <h3 className="max-w-[35%] text-md md:text-xl lg:text-4xl text-start mx-auto ml-0 mb-2 md:mb-4 lg:mb-10">
+                <h3 className="w-full md:max-w-[35%] text-md md:text-xl lg:text-4xl items-center md:text-start mx-auto ml-0 mb-2 md:mb-4 lg:mb-10">
                     "Where Every Detail Dances in Elegance—Discover the Art of Unforgettable Moments."
                 </h3>
 
@@ -110,9 +110,9 @@ const HeroSection = () => {
             </div>
 
             {/* Buttons */}
-            <div className='flex flex-col md:flex-row justify-between z-10 align-middle items-start w-full md:w-[30%] px-5'>
+            <div className='flex flex-row justify-center md:justify-between z-10 align-middle items-center md:items-start w-full md:w-[30%] px-5'>
                 {/* Services */}
-                <div className="relative">
+                <div className="relative mr-5">
                     <button
                         ref={servicesButtonRef}
                         className="relative px-4 py-2 bg-primary text-accent text-lg rounded-md overflow-hidden font-bold"
@@ -133,23 +133,23 @@ const HeroSection = () => {
             </div>
 
             {/* Top Gradient */}
-            <div className='z-10 bg-sunken-circle fixed bottom-[8%] flex flex-col justify-center items-center align-middle w-full h-[10%] opacity-10'>
+            <div className='z-10 md:bg-sunken-circle md:fixed bottom-[8%] md:flex flex-col justify-center items-center align-middle w-full h-[10%] opacity-10 hidden'>
             </div>
 
             {/* Partners */}
-            <div className='fixed bottom-0 z-10 flex flex-col md:flex-row justify-around items-center align-middle w-full bg-bright-purple h-[20%] text-accent font-black text-xl'>
+            <div className='fixed bottom-0 z-10 md:flex flex-col md:flex-row justify-around items-center align-middle w-full md:bg-bright-purple h-[20%] text-accent font-black text-xl pt-10 hidden'>
                 {/* Beyond 001 */}
-                <div>
+                <div className=''>
                     Beyond 001
                 </div>
 
                 {/* Wilhide Bakers */}
-                <div>
+                <div className=''>
                     Wilhide Bakers
                 </div>
 
                 {/* Digimatic Marketers */}
-                <div>
+                <div className=''> 
                     Digimatic Marketers
                 </div>
             </div>

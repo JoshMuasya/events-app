@@ -1,0 +1,86 @@
+[
+  {
+    "id": "event-001",
+    "name": "Tech Conference 2025",
+    "dateTime": "2025-06-15T09:00:00Z",
+    "status": "Published",
+    "location": "Nairobi Convention Center",
+    "isVirtual": false,
+    "ticketSales": 500,
+    "totalRevenue": 25000,
+    "ticketsSoldPercentage": 80,
+    "attendeeDemographics": [
+      { "ageGroup": "18-24", "count": 150 },
+      { "ageGroup": "25-34", "count": 200 },
+      { "ageGroup": "35-44", "count": 100 },
+      { "ageGroup": "45+", "count": 50 }
+    ],
+    "engagementScore": 85,
+    "image": "https://firebasestorage.googleapis.com/v0/b/sample-bucket/o/events/tech-conference.jpg?alt=media"
+  },
+  {
+    "id": "event-002",
+    "name": "Virtual AI Summit",
+    "dateTime": "2025-07-10T14:00:00Z",
+    "status": "Ongoing",
+    "location": "Zoom Webinar",
+    "isVirtual": true,
+    "ticketSales": 300,
+    "totalRevenue": 15000,
+    "ticketsSoldPercentage": 60,
+    "attendeeDemographics": [
+      { "ageGroup": "18-24", "count": 100 },
+      { "ageGroup": "25-34", "count": 120 },
+      { "ageGroup": "35-44", "count": 80 }
+    ],
+    "engagementScore": 90,
+    "image": "https://firebasestorage.googleapis.com/v0/b/sample-bucket/o/events/ai-summit.jpg?alt=media"
+  },
+  {
+    "id": "event-003",
+    "name": "Music Festival",
+    "dateTime": "2025-08-20T18:00:00Z",
+    "status": "Draft",
+    "location": "Uhuru Park, Nairobi",
+    "isVirtual": false,
+    "ticketSales": 0,
+    "totalRevenue": 0,
+    "ticketsSoldPercentage": 0,
+    "attendeeDemographics": [],
+    "engagementScore": 0
+  },
+  {
+    "id": "event-004",
+    "name": "Startup Pitch Night",
+    "dateTime": "2025-05-30T19:00:00Z",
+    "status": "Completed",
+    "location": "iHub Nairobi",
+    "isVirtual": false,
+    "ticketSales": 200,
+    "totalRevenue": 10000,
+    "ticketsSoldPercentage": 100,
+    "attendeeDemographics": [
+      { "ageGroup": "18-24", "count": 50 },
+      { "ageGroup": "25-34", "count": 100 },
+      { "ageGroup": "35-44", "count": 50 }
+    ],
+    "engagementScore": 75,
+    "image": "https://firebasestorage.googleapis.com/v0/b/sample-bucket/o/events/startup-pitch.jpg?alt=media"
+  },
+  {
+    "id": "event-005",
+    "name": "Charity Run",
+    "dateTime": "2025-09-05T07:00:00Z",
+    "status": "Cancelled",
+    "location": "Ngong Forest",
+    "isVirtual": false,
+    "ticketSales": 50,
+    "totalRevenue": 2500,
+    "ticketsSoldPercentage": 10,
+    "attendeeDemographics": [
+      { "ageGroup": "18-24", "count": 20 },
+      { "ageGroup": "25-34", "count": 30 }
+    ],
+    "engagementScore": 20
+  }
+]

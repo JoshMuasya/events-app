@@ -19,6 +19,7 @@ import { EventDetail, UserEvent } from "@/lib/types";
 import { useAuth } from "@/lib/AuthContext";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import { storage } from "@/lib/firebase";
+import { format, isValid } from "date-fns";
 
 // Form schema for validation
 const eventSchema = z
@@ -50,26 +51,26 @@ export default function EventManagement() {
   const [dateRange, setDateRange] = useState<{ start: Date | null; end: Date | null }>({ start: null, end: null });
   const [currentPage, setCurrentPage] = useState(1);
   const [staffUsers, setStaffUsers] = useState<UserEvent[]>([]);
-  const { user: authUser, loading: authLoading, role: Role } = useAuth()
+  const { user: authUser, loading: authLoading, role: Role } = useAuth();
   const eventsPerPage = 10;
 
   // Fetch Events
   const fetchEvents = async () => {
     try {
-      setIsLoading(true)
+      setIsLoading(true);
       const response = await fetch("/api/events/event-management");
       if (!response.ok) {
-        throw new Error("Failed to fetch events")
+        throw new Error("Failed to fetch events");
       }
-      const data = await response.json()
-      setEvents(data)
+      const data = await response.json();
+      setEvents(data);
     } catch (error) {
       console.error("Error fetching Events:", error);
       toast.error("Failed to load Events");
     } finally {
       setIsLoading(false);
     }
-  }
+  };
 
   // Fetch Users
   const fetchUsers = async () => {
@@ -91,11 +92,9 @@ export default function EventManagement() {
   };
 
   useEffect(() => {
-    fetchEvents()
-    fetchUsers()
-  }, [])
-
-  console.log("Events", events)
+    fetchEvents();
+    fetchUsers();
+  }, []);
 
   const isAdmin = Role === "Admin";
 
@@ -115,12 +114,29 @@ export default function EventManagement() {
     resolver: zodResolver(eventSchema),
   });
 
+  // Define getEventType before filteredEvents to avoid TDZ error
+  const getEventType = (event: EventDetail) => {
+    const now = new Date();
+    const eventDate = new Date(event.date);
+    if (event.status === "Draft" || event.status === "Cancelled") {
+      return "archived";
+    } else if (eventDate > now) {
+      return "upcoming";
+    } else if (eventDate <= now && event.status === "Ongoing") {
+      return "ongoing";
+    } else {
+      return "archived";
+    }
+  };
+
   // Filter events
   const filteredEvents = useMemo(() => {
     let filtered = events.filter((event) => {
-      const eventDate = new Date(event.dateTime);
+      const eventDate = new Date(event.date);
       const start = dateRange.start ? new Date(dateRange.start) : null;
       const end = dateRange.end ? new Date(dateRange.end) : null;
+      const eventType = getEventType(event);
+
       return (
         (searchQuery
           ? Object.values(event)
@@ -128,11 +144,16 @@ export default function EventManagement() {
             .toLowerCase()
             .includes(searchQuery.toLowerCase())
           : true) &&
-        (filterStatus !== "All" ? event.status === filterStatus : true) &&
         (!start || eventDate >= start) &&
-        (!end || eventDate <= end)
+        (!end || eventDate <= end) &&
+        (filterStatus === "All" ||
+          (filterStatus === "Ongoing" && event.status === "Ongoing") ||
+          (filterStatus === "Drafts" && event.status === "Draft") ||
+          (filterStatus === "Upcoming" && eventType === "upcoming") ||
+          (filterStatus === "Archived" && eventType === "archived"))
       );
     });
+
     if (!isAdmin) {
       filtered = filtered.filter(
         (event) => event.createdBy === authUser?.uid || event.assignedStaff.includes(authUser?.uid)
@@ -205,8 +226,8 @@ export default function EventManagement() {
       let downloadUrl = "";
       if (data.image && data.image instanceof File) {
         const imageRef = ref(storage, `events/${Date.now()}_${data.name}`);
-        const snapshot = await uploadBytes(imageRef, data.image)
-        downloadUrl = await getDownloadURL(snapshot.ref)
+        const snapshot = await uploadBytes(imageRef, data.image);
+        downloadUrl = await getDownloadURL(snapshot.ref);
       }
 
       let ticketSales = 0;
@@ -215,12 +236,12 @@ export default function EventManagement() {
       const response = await fetch("/api/events/event-management", {
         method: "POST",
         headers: {
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           eventName: data.name,
           image: downloadUrl,
-          createdBy: authUser.displayName,
+          createdBy: authUser?.displayName,
           assignedStaff: data.assignedStaff,
           ticketSales: ticketSales,
           totalRevenue: totalRevenue,
@@ -229,21 +250,20 @@ export default function EventManagement() {
           status: data.status,
           location: data.location,
           isVirtual: data.isVirtual,
-          date: data.dateTime
-        })
+          date: data.dateTime,
+        }),
       });
-
-      console.log("Submiting", authUser.displayName)
 
       if (!response.ok) {
         const result = await response.json();
-        throw new Error(result.error || "Failed to create user")
+        throw new Error(result.error || "Failed to create event");
       }
 
       toast.success("Event Added Successfully");
       setIsAddingEvent(false);
       reset();
       setError(null);
+      fetchEvents(); // Refresh events after adding
     } catch (err) {
       toast.error("Failed to Add Event");
       setError(err instanceof Error ? err.message : "Failed to create event");
@@ -264,7 +284,7 @@ export default function EventManagement() {
   // Share event on social media
   const shareEvent = (platform: string, event: EventDetail) => {
     const url = `${window.location.origin}/events/${event.id}`;
-    const text = `Check out ${event.name} on ${new Date(event.dateTime).toLocaleString()} at ${event.location}!`;
+    const text = `Check out ${event.eventName} on ${new Date(event.date).toLocaleString()} at ${event.location}!`;
     let shareUrl = "";
     switch (platform) {
       case "x":
@@ -286,26 +306,12 @@ export default function EventManagement() {
     window.open(shareUrl, "_blank");
   };
 
-  // Get event type for shading
-  const getEventType = (event: EventDetail) => {
-    const now = new Date();
-    const eventDate = new Date(event.dateTime);
-    if (event.status === "Draft" || event.status === "Cancelled") {
-      return "archived";
-    } else if (eventDate > now) {
-      return "upcoming";
-    } else if (eventDate <= now && event.status === "Ongoing") {
-      return "ongoing";
-    } else {
-      return "archived";
-    }
-  };
-
   // Stats
   const totalEvents = filteredEvents.length;
   const totalOngoing = filteredEvents.filter((e) => e.status === "Ongoing").length;
-  const totalPublished = filteredEvents.filter((e) => e.status === "Published").length;
-  const totalRevenue = filteredEvents.reduce((sum, e) => sum + e.totalRevenue, 0);
+  const totalDrafts = filteredEvents.filter((e) => e.status === "Draft").length;
+  const totalUpcoming = filteredEvents.filter((e) => getEventType(e) === "upcoming").length;
+  const totalArchived = filteredEvents.filter((e) => getEventType(e) === "archived").length;
 
   if (authLoading || isLoading) {
     return (
@@ -320,6 +326,8 @@ export default function EventManagement() {
       </div>
     );
   }
+
+  console.log("events", events)
 
   return (
     <div className="container mx-auto p-6">
@@ -430,7 +438,7 @@ export default function EventManagement() {
                 <label htmlFor="isVirtual" className="block text-sm font-medium">
                   Virtual Event
                 </label>
-                <input
+                Miller <input
                   id="isVirtual"
                   type="checkbox"
                   {...register("isVirtual")}
@@ -569,12 +577,11 @@ export default function EventManagement() {
             onChange={(e) => setFilterStatus(e.target.value)}
             aria-label="Filter events by status"
           >
-            <option value="All">All Statuses</option>
-            <option value="Draft">Draft</option>
+            <option value="All">All Events</option>
+            <option value="Drafts">Drafts</option>
             <option value="Ongoing">Ongoing</option>
-            <option value="Cancelled">Cancelled</option>
-            <option value="Published">Published</option>
-            <option value="Completed">Completed</option>
+            <option value="Upcoming">Upcoming</option>
+            <option value="Archived">Archived</option>
           </select>
         </div>
         <div className="flex gap-4">
@@ -605,8 +612,9 @@ export default function EventManagement() {
         {[
           { value: totalEvents, label: "Total Events" },
           { value: totalOngoing, label: "Ongoing Events" },
-          { value: totalPublished, label: "Published Events" },
-          { value: `$${totalRevenue.toLocaleString()}`, label: "Total Revenue" },
+          { value: totalDrafts, label: "Draft Events" },
+          { value: totalUpcoming, label: "Upcoming Events" },
+          { value: totalArchived, label: "Archived Events" },
         ].map((stat, index) => (
           <motion.div
             key={index}
@@ -623,27 +631,33 @@ export default function EventManagement() {
       </div>
 
       {/* Event Cards */}
-      {currentEvents.length === 0 ? (
+      {filteredEvents.length === 0 ? (
         <div className="text-center py-10 text-[#6A0DAD]" role="alert">
           <p>No events found.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {currentEvents.map((event) => {
+          {filteredEvents.map((event) => {
             const eventType = getEventType(event);
             const typeClass =
               eventType === "upcoming"
-                ? "bg-blue-100"
+                ? "bg-[rgba(255,215,0,0.2)]"
                 : eventType === "ongoing"
-                  ? "bg-green-100"
-                  : "bg-gray-100";
-            // Compute assignedStaffNames from staffUsers
+                  ? "bg-[rgba(255,215,0,0.3)]"
+                  : eventType === "archived"
+                    ? "bg-[rgba(255,215,0,0.1)]"
+                    : "bg-[rgba(255,215,0,0.4)]";
             const assignedStaffNames = event.assignedStaff
               .map((staffId) => {
                 const user = (staffUsers || []).find((u) => u.id === staffId);
                 return user ? user.name : "Unknown";
               })
               .filter(Boolean);
+            const eventDate = new Date(event.date);
+            const formattedDate = isValid(eventDate) ? format(eventDate, "MMMM d, yyyy h:mm a") : "Invalid Date";
+
+            console.log(formattedDate)
+            
             return (
               <motion.div
                 key={event.id}
@@ -657,18 +671,16 @@ export default function EventManagement() {
                 <div className="flex items-center gap-4 mb-4">
                   <Image
                     src={event.image || "/event-placeholder.png"}
-                    alt={`${event.name} image`} // Use eventName
+                    alt={`${event.eventName} image`}
                     width={80}
                     height={80}
                     className="rounded-lg object-cover"
                   />
                   <div>
                     <Link href={`/events/${event.id}`} className="text-lg font-semibold hover:underline">
-                      {event.name} {/* Use eventName instead of name */}
+                      {event.eventName}
                     </Link>
-                    <p className="text-sm opacity-80">
-                      {new Date(event.dateTime).toLocaleString()} {/* Use date instead of dateTime */}
-                    </p>
+                    <p className="text-sm opacity-80">{formattedDate}</p>
                     <p className="text-sm opacity-80">
                       {event.isVirtual ? (
                         <span className="badge badge-primary">Virtual</span>
@@ -696,21 +708,21 @@ export default function EventManagement() {
                   <Link
                     href={`/events/${event.id}`}
                     className="btn btn-sm bg-[#6A0DAD] text-white hover:bg-[#FFD700] hover:text-[#6A0DAD]"
-                    aria-label={`View ${event.name}`}
+                    aria-label={`View ${event.eventName}`}
                   >
                     View
                   </Link>
                   <Link
                     href={`/events/${event.id}/analytics`}
                     className="btn btn-sm bg-[#6A0DAD] text-white hover:bg-[#FFD700] hover:text-[#6A0DAD]"
-                    aria-label={`View analytics for ${event.name}`}
+                    aria-label={`View analytics for ${event.eventName}`}
                   >
                     Analytics
                   </Link>
                   <button
                     className="btn btn-sm bg-[#6A0DAD] text-white hover:bg-[#FFD700] hover:text-[#6A0DAD]"
                     onClick={() => toast.success("Promote functionality coming soon!")}
-                    aria-label={`Promote ${event.name}`}
+                    aria-label={`Promote ${event.eventName}`}
                   >
                     Promote
                   </button>
@@ -719,35 +731,35 @@ export default function EventManagement() {
                   <button
                     className="btn btn-sm btn-circle bg-[#6A0DAD] text-white hover:bg-[#FFD700] hover:text-[#6A0DAD]"
                     onClick={() => shareEvent("x", event)}
-                    aria-label={`Share ${event.name} on X`}
+                    aria-label={`Share ${event.eventName} on X`}
                   >
                     <FaTwitter aria-hidden="true" />
                   </button>
                   <button
                     className="btn btn-sm btn-circle bg-[#6A0DAD] text-white hover:bg-[#FFD700] hover:text-[#6A0DAD]"
                     onClick={() => shareEvent("facebook", event)}
-                    aria-label={`Share ${event.name} on Facebook`}
+                    aria-label={`Share ${event.eventName} on Facebook`}
                   >
                     <FaFacebook aria-hidden="true" />
                   </button>
                   <button
                     className="btn btn-sm btn-circle bg-[#6A0DAD] text-white hover:bg-[#FFD700] hover:text-[#6A0DAD]"
                     onClick={() => shareEvent("instagram", event)}
-                    aria-label={`Share ${event.name} on Instagram`}
+                    aria-label={`Share ${event.eventName} on Instagram`}
                   >
                     <FaInstagram aria-hidden="true" />
                   </button>
                   <button
                     className="btn btn-sm btn-circle bg-[#6A0DAD] text-white hover:bg-[#FFD700] hover:text-[#6A0DAD]"
                     onClick={() => shareEvent("tiktok", event)}
-                    aria-label={`Share ${event.name} on TikTok`}
+                    aria-label={`Share ${event.eventName} on TikTok`}
                   >
                     <FaTiktok aria-hidden="true" />
                   </button>
                   <button
                     className="btn btn-sm btn-circle bg-[#6A0DAD] text-white hover:bg-[#FFD700] hover:text-[#6A0DAD]"
                     onClick={() => shareEvent("whatsapp", event)}
-                    aria-label={`Share ${event.name} on WhatsApp`}
+                    aria-label={`Share ${event.eventName} on WhatsApp`}
                   >
                     <FaWhatsapp aria-hidden="true" />
                   </button>

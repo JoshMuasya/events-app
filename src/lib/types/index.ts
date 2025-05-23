@@ -53,8 +53,8 @@ export interface UserEvent {
 
 export interface EventDetail {
   id: string;
-  name: string;
-  dateTime: string;
+  eventName: string;
+  date: string;
   status: "Draft" | "Ongoing" | "Cancelled" | "Published" | "Completed";
   location: string;
   isVirtual: boolean;

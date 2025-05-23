@@ -55,7 +55,7 @@ export default function UserDetails({ userId }: { userId: string }) {
   useEffect(() => {
     const fetchUser = async () => {
       try {
-        console.log("User", userId);
+        console.log("UserName", authUser.displayName);
         const res = await fetch('/api/users');
         if (!res.ok) throw new Error("Failed to Fetch Users!!!");
         const data: UserDetail[] = await res.json();

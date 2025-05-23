@@ -45,3 +45,29 @@ export interface UserEditProps {
 }
 
 export type UserField = "name" | "email" | "phone" | "role";
+
+export interface UserEvent {
+  id: string;
+  name: string;
+}
+
+export interface EventDetail {
+  id: string;
+  name: string;
+  dateTime: string;
+  status: "Draft" | "Ongoing" | "Cancelled" | "Published" | "Completed";
+  location: string;
+  isVirtual: boolean;
+  ticketSales: number;
+  totalRevenue: number;
+  ticketsSoldPercentage: number;
+  attendeeDemographics: { ageGroup: string; count: number }[];
+  engagementScore: number;
+  image?: string;
+  createdBy: string;
+  createdByName: string;
+  assignedStaff: string[];
+  assignedStaffNames: string[];
+  invitesOnly: boolean;
+  maxAttendees?: number;
+}

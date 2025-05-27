@@ -70,4 +70,33 @@ export interface EventDetail {
   assignedStaffNames: string[];
   invitesOnly: boolean;
   maxAttendees?: number;
+  contactPhone: string;
+  contactEmail: string;
+  accessibilityInfo: string;
+  tags: string;
+  category: "Conference" | "Workshop" | "Concert" | "Networking"
+  waitlistLimit: number;
+  waitlistEnabled: boolean;
+  ticketPrice: number;
+  ticketEnabled: boolean;
+  speaker: Speakers;
+  agenda: string;
+  eventDesc: string;
+  theme: EventStyling;
+  googleMapsLink: string;
+}
+
+export interface Speakers {
+    speakerName: string;
+    description: string;
+    profileImage: string | null;
+}
+
+export interface EventStyling {
+    bodyFont: "Roboto" | "Open Sans" | "Montserrat" | "Lora";
+    headingFont: "Roboto" | "Open Sans" | "Montserrat" | "Lora";
+    textColor: string;
+    backgroundColor: string;
+    secondaryColor: string;
+    primaryColor: string;
 }

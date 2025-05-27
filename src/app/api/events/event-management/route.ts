@@ -15,7 +15,39 @@ export async function GET() {
 export async function POST(request: Request) {
     try {
         const body = await request.json();
-        const { eventName, image, createdBy, assignedStaff, ticketSales, totalRevenue, isInvitesOnly, maxAttendies, status, location, isVirtual, date } = body;
+        const {
+            eventName,
+            image,
+            createdBy,
+            assignedStaff,
+            ticketSales,
+            totalRevenue,
+            isInvitesOnly,
+            maxAttendies,
+            status,
+            location,
+            isVirtual,
+            date,
+            direction,
+            primaryColor,
+            secondaryColor,
+            backgroundColor,
+            textColor,
+            headingFont,
+            bodyFont,
+            eventDesc,
+            agenda,
+            speakers,
+            ticketEnabled,
+            ticketPrice,
+            waitlistEnabled,
+            waitlistLimit,
+            category,
+            tags,
+            accessibilityInfo,
+            contactEmail,
+            contactPhone
+        } = body;
 
         const eventId = `${eventName.replace(/\s+/g, '-').toLowerCase()}-${Date.now()}`;
 
@@ -41,8 +73,28 @@ export async function POST(request: Request) {
             location,
             isVirtual,
             date,
+            direction,
+            primaryColor,
+            secondaryColor,
+            backgroundColor,
+            textColor,
+            headingFont,
+            bodyFont,
+            eventDesc,
+            agenda,
+            speakers,
+            ticketEnabled,
+            ticketPrice,
+            waitlistEnabled,
+            waitlistLimit,
+            category,
+            tags,
+            accessibilityInfo,
+            contactEmail,
+            contactPhone,
             createdAt: serverTimestamp()
-        })
+        });
+
 
         return NextResponse.json({
             message: "Event Data received"

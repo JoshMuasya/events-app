@@ -1222,7 +1222,7 @@ export default function EventManagement() {
                     className="rounded-lg object-cover"
                   />
                   <div>
-                    <Link href={`/events/${event.id}`} className="text-lg font-semibold hover:underline">
+                    <Link href={`/event-management/${event.id}`} className="text-lg font-semibold hover:underline">
                       {event.eventName}
                     </Link>
                     <p className="text-sm opacity-80">{formattedDate}</p>

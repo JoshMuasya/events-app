@@ -39,7 +39,7 @@ export default function Dashboard() {
                 { month: "May", events: 10 },
             ],
             chartType: "line",
-            href: "/events/event-management",
+            href: "/event-management",
         },
         {
             title: "RSVPs",

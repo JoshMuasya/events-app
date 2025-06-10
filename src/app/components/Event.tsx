@@ -113,7 +113,46 @@ export default function EventPage() {
     // };
 
     if (authLoading || loading) {
-        return <LoadingState />;
+        return (
+            <div className="max-w-4xl mx-auto p-6">
+                <div className="bg-white/5 backdrop-blur-sm p-6 rounded-xl shadow-lg animate-pulse border border-white/10">
+                    {/* Event Header Section */}
+                    <div className="h-10 bg-gray-300/30 rounded w-1/2 mb-4"></div>
+                    <div className="h-5 bg-gray-400/30 rounded w-1/3 mb-6"></div>
+
+                    {/* Event Image Placeholder */}
+                    <div className="h-64 bg-gray-300/30 rounded-lg mb-6"></div>
+
+                    {/* Event Details Section */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                        <div>
+                            <div className="h-5 bg-gray-400/50 rounded w-1/4 mb-2"></div>
+                            <div className="h-4 bg-gray-400/30 rounded w-3/4 mb-4"></div>
+                            <div className="h-5 bg-gray-400/50 rounded w-1/4 mb-2"></div>
+                            <div className="h-4 bg-gray-400/30 rounded w-2/3 mb-4"></div>
+                        </div>
+                        <div>
+                            <div className="h-5 bg-gray-400/50 rounded w-1/4 mb-2"></div>
+                            <div className="h-4 bg-gray-400/30 rounded w-3/4 mb-4"></div>
+                            <div className="h-5 bg-gray-400/50 rounded w-1/4 mb-2"></div>
+                            <div className="h-4 bg-gray-400/30 rounded w-2/3 mb-4"></div>
+                        </div>
+                    </div>
+
+                    {/* Description Section */}
+                    <div className="h-5 bg-gray-400/50 rounded w-1/3 mb-2"></div>
+                    <div className="h-4 bg-gray-400/30 rounded w-full mb-2"></div>
+                    <div className="h-4 bg-gray-400/30 rounded w-5/6 mb-2"></div>
+                    <div className="h-4 bg-gray-400/30 rounded w-3/4 mb-6"></div>
+
+                    {/* Action Buttons */}
+                    <div className="flex space-x-4">
+                        <div className="h-10 w-32 bg-gray-300/30 rounded"></div>
+                        <div className="h-10 w-32 bg-gray-300/30 rounded"></div>
+                    </div>
+                </div>
+            </div>
+        )
     }
 
     if (error || !event) {
@@ -121,8 +160,6 @@ export default function EventPage() {
     }
 
     const isEventOver = new Date(event.date) < new Date();
-
-    console.log("Events", event)
 
     return (
         <div
@@ -144,7 +181,7 @@ export default function EventPage() {
             />
 
             {/* <EventAnalytics isStaff={isStaff} eventId={eventId} /> */}
-            {/* <EventSidebar event={event} handleAddToCalendar={handleAddToCalendar} shareEvent={shareEvent} /> */}            
+            {/* <EventSidebar event={event} handleAddToCalendar={handleAddToCalendar} shareEvent={shareEvent} /> */}
         </div>
     );
 }

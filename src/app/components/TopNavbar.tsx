@@ -4,9 +4,15 @@ import Link from "next/link";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState } from "react";
+import toast from "react-hot-toast";
+import { useRouter } from "next/navigation";
+import { auth } from "@/lib/firebase";
+import { signOut } from "firebase/auth";
 
 export default function TopBar() {
     const [isOpen, setIsOpen] = useState(false);
+    const [isLoggingOut, setIsLoggingOut] = useState(false)
+    const router = useRouter();
 
     // Dropdown menu animation variants
     const menuVariants = {
@@ -44,6 +50,21 @@ export default function TopBar() {
                 duration: 0.2,
             },
         },
+    };
+
+    const handleLogout = async () => {
+        setIsLoggingOut(true);
+        try {
+            await signOut(auth);
+            console.log("User logged out successfully");
+            // Redirect to login page after logout
+            router.push("/login");
+        } catch (error) {
+            console.error("Logout failed:", error);
+            setIsLoggingOut(false);
+            // Optionally, show an error to the user (e.g., toast notification)
+            toast.error("Failed to log out. Please try again.");
+        }
     };
 
     return (
@@ -128,7 +149,13 @@ export default function TopBar() {
                                     <a>Request Password Change</a>
                                 </motion.li>
                                 <motion.li variants={itemVariants} whileHover="hover" initial="rest">
-                                    <a className="text-red-500">Logout</a>
+                                    <button
+                                        onClick={handleLogout}
+                                        disabled={isLoggingOut}
+                                        className={`text-red-500 w-full text-left ${isLoggingOut ? "opacity-50 cursor-not-allowed" : ""}`}
+                                    >
+                                        {isLoggingOut ? "Logging out..." : "Logout"}
+                                    </button>
                                 </motion.li>
                             </motion.ul>
                         )}

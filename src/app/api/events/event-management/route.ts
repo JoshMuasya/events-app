@@ -1,5 +1,5 @@
 import { db } from "@/lib/firebase";
-import { collection, doc, getDocs, serverTimestamp, setDoc } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, serverTimestamp, setDoc } from "firebase/firestore";
 import { NextResponse } from "next/server";
 
 export async function GET() {
@@ -49,6 +49,21 @@ export async function POST(request: Request) {
             contactPhone
         } = body;
 
+        const validatedSpeakers: string[] = [];
+        if (speakers && Array.isArray(speakers) && speakers.length > 0) {
+            for (const speakerId of speakers) {
+                const speakerRef = doc(db, "speakers", speakerId);
+                const speakerSnap = await getDoc(speakerRef);
+                if (!speakerSnap.exists()) {
+                    return NextResponse.json(
+                        { error: `Invalid speaker ID: ${speakerId} does not exist in the speakers collection` },
+                        { status: 400 }
+                    );
+                }
+                validatedSpeakers.push(speakerId);
+            }
+        }
+
         const eventId = `${eventName.replace(/\s+/g, '-').toLowerCase()}-${Date.now()}`;
 
         console.log("Event ID:", eventId);
@@ -59,45 +74,46 @@ export async function POST(request: Request) {
             }, { status: 400 })
         }
 
-        await setDoc(doc(db, "events", eventId), {
-            eventId: eventId,
+        const eventData = {
+            eventId,
             eventName,
-            image,
+            image: image || null,
             createdBy,
-            assignedStaff,
-            ticketSales,
-            totalRevenue,
-            isInvitesOnly,
-            maxAttendies,
+            assignedStaff: assignedStaff || [],
+            ticketSales: ticketSales || 0,
+            totalRevenue: totalRevenue || 0,
+            isInvitesOnly: isInvitesOnly || false,
+            maxAttendies: isInvitesOnly ? maxAttendies : null,
             status,
             location,
-            isVirtual,
+            isVirtual: isVirtual || false,
             date,
-            direction,
-            primaryColor,
-            secondaryColor,
-            backgroundColor,
-            textColor,
-            headingFont,
-            bodyFont,
-            eventDesc,
-            agenda,
-            speakers,
-            ticketEnabled,
-            ticketPrice,
-            waitlistEnabled,
-            waitlistLimit,
-            category,
-            tags,
-            accessibilityInfo,
-            contactEmail,
-            contactPhone,
-            createdAt: serverTimestamp()
-        });
+            direction: direction || null,
+            primaryColor: primaryColor || null,
+            secondaryColor: secondaryColor || null,
+            backgroundColor: backgroundColor || null,
+            textColor: textColor || null,
+            headingFont: headingFont || null,
+            bodyFont: bodyFont || null,
+            eventDesc: eventDesc || null,
+            agenda: agenda || null,
+            speakers: validatedSpeakers, // Use validated speaker IDs
+            ticketEnabled: ticketEnabled || false,
+            ticketPrice: ticketEnabled ? ticketPrice : null,
+            waitlistEnabled: waitlistEnabled || false,
+            waitlistLimit: waitlistEnabled ? waitlistLimit : null,
+            category: category || null,
+            tags: tags || "",
+            accessibilityInfo: accessibilityInfo || null,
+            contactEmail: contactEmail || null,
+            contactPhone: contactPhone || null,
+            createdAt: serverTimestamp(),
+        };
 
+        await setDoc(doc(db, "events", eventId), eventData);
 
         return NextResponse.json({
-            message: "Event Data received"
+            message: "Event created successfully", eventId
         }, { status: 201 })
     } catch (error: any) {
         console.error("Event creation error:", error.message);

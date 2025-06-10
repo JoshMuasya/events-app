@@ -1,228 +1,302 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { FiChevronDown, FiChevronUp } from "react-icons/fi";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
-import toast from "react-hot-toast";
+import { EventEditData, SpeakerOption, Speakers, StaffOption, User } from '@/lib/types';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useParams, useRouter } from 'next/navigation';
+import React, { useEffect, useState } from 'react';
+import { useForm, FormProvider } from 'react-hook-form';
+import { toast } from 'react-hot-toast';
+import { z } from 'zod';
 import Select from "react-select";
-import DatePicker from "react-datepicker";
-import "react-datepicker/dist/react-datepicker.css";
-import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
-import { storage } from "@/lib/firebase";
-import { format, isValid } from "date-fns";
-import { EventDetail, Speakers, UserEvent } from "@/lib/types";
+import { useAuth } from '@/lib/AuthContext';
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Select as ShadcnSelect, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Settings } from 'lucide-react';
 
-// Form schema for validation (same as in EventManagement for consistency)
-const eventSchema = z
+const eventEditSchema = z
   .object({
-    name: z.string().min(1, "Event name is required").max(100, "Event name is too long"),
-    dateTime: z.string().min(1, "Date and time are required"),
+    eventName: z.string().min(1, "Event name is required").max(100, "Event name is too long"),
+    date: z.string().min(1, "Date and time are required"),
     location: z.string().min(1, "Location is required").max(200, "Location is too long"),
     isVirtual: z.boolean(),
-    googleMapsLink: z.string().url("Invalid Google Maps URL").optional(),
-    status: z.enum(["Draft", "Ongoing", "Cancelled", "Published", "Completed"], { errorMap: () => ({ message: "Status is required" }) }),
-    image: z.union([z.instanceof(File), z.string().url().optional(), z.string().optional()]).optional().nullable(),
-    primaryColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/, "Invalid hex color code").optional(),
-    secondaryColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/, "Invalid hex color code").optional(),
-    backgroundColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/, "Invalid hex color code").optional(),
-    textColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/, "Invalid hex color code").optional(),
+    direction: z.string().url("Invalid Google Maps URL"),
+    status: z.enum(["Draft", "Published", "Unpublished", "Ongoing", "Cancelled", "Completed"], {
+      errorMap: () => ({ message: "Status is required" }),
+    }),
+    image: z.union([z.instanceof(File), z.string().url(), z.string()]).optional().nullable(),
+    primaryColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/, "Invalid hex color code"),
+    secondaryColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/, "Invalid hex color code"),
+    backgroundColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/, "Invalid hex color code"),
+    textColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/, "Invalid hex color code"),
     headingFont: z.enum(["Roboto", "Open Sans", "Montserrat", "Lora"], {
       errorMap: () => ({ message: "Invalid heading font" }),
-    }).optional(),
+    }),
     bodyFont: z.enum(["Roboto", "Open Sans", "Montserrat", "Lora"], {
       errorMap: () => ({ message: "Invalid body font" }),
-    }).optional(),
-    eventDesc: z.string().max(1000, "Description is too long").optional(),
-    agenda: z.string().max(2000, "Agenda is too long").optional(),
-    existingSpeakers: z.array(z.string()).optional(),
-    ticketEnabled: z.boolean().optional(),
-    ticketPrice: z.number().positive("Ticket price must be positive").optional(),
-    waitlistEnabled: z.boolean().optional(),
-    waitlistLimit: z.number().int().positive("Waitlist limit must be positive").optional(),
-    category: z.enum(["Conference", "Workshop", "Concert", "Networking", ""], {
+    }),
+    eventDesc: z.string().max(1000, "Description is too long"),
+    agenda: z.string().max(2000, "Agenda is too long"),
+    speakers: z.array(
+      z.object({
+        id: z.string(),
+        speakerName: z.string().min(1, "Speaker name is required"),
+        description: z.string().max(1000, "Description is too long"),
+        profileImage: z.string().url("Invalid image URL").nullable(),
+      })
+    ),
+    ticketEnabled: z.boolean(),
+    ticketPrice: z.number().nullable(),
+    waitlistEnabled: z.boolean(),
+    waitlistLimit: z.number().int().nullable(),
+    category: z.enum(["Conference", "Workshop", "Concert", "Networking"], {
       errorMap: () => ({ message: "Invalid category" }),
-    }).optional(),
-    tags: z.string().max(200, "Tags are too long").optional(),
-    accessibilityInfo: z.string().max(500, "Accessibility information is too long").optional(),
-    contactEmail: z.string().email("Invalid email address").optional(),
-    contactPhone: z.string().max(20, "Phone number is too long").optional(),
-    assignedStaff: z.array(z.string()),
-    invitesOnly: z.boolean(),
-    maxAttendees: z.number().int().positive().optional(),
+    }),
+    tags: z.string().max(200, "Tags are too long"),
+    accessibilityInfo: z.string().max(500, "Accessibility information is too long"),
+    contactEmail: z.string().email("Invalid email address"),
+    contactPhone: z.string().max(20, "Phone number is too long"),
+    assignedStaff: z.array(z.string()).optional(),
+    isInvitesOnly: z.boolean(),
+    maxAttendees: z.number().int().nullable(),
+    createdAt: z.any().optional(),
+    createdBy: z.string().optional(),
+    eventId: z.string(),
   })
   .refine(
-    (data) => !data.invitesOnly || (data.maxAttendees && data.maxAttendees > 0),
-    {
-      message: "Max attendees is required for invites-only events",
-      path: ["maxAttendees"],
-    }
-  )
-  .refine(
-    (data) => !data.ticketEnabled || (data.ticketPrice && data.ticketPrice > 0),
+    (data) => !data.ticketEnabled || (data.ticketPrice !== null && data.ticketPrice > 0),
     {
       message: "Ticket price is required when tickets are enabled",
       path: ["ticketPrice"],
     }
   )
   .refine(
-    (data) => !data.waitlistEnabled || (data.waitlistLimit && data.waitlistLimit > 0),
+    (data) => !data.waitlistEnabled || (data.waitlistLimit !== null && data.waitlistLimit > 0),
     {
       message: "Waitlist limit is required when waitlist is enabled",
       path: ["waitlistLimit"],
     }
   )
   .refine(
-    (data) => data.isVirtual || (data.googleMapsLink && data.googleMapsLink.length > 0),
+    (data) => !data.isInvitesOnly || (data.maxAttendees !== null && data.maxAttendees > 0),
+    {
+      message: "Max attendees is required for invites-only events",
+      path: ["maxAttendees"],
+    }
+  )
+  .refine(
+    (data) => data.isVirtual || (data.direction && data.direction.length > 0),
     {
       message: "Google Maps link is required for non-virtual events",
-      path: ["googleMapsLink"],
+      path: ["direction"],
     }
   );
 
-type FormData = z.infer<typeof eventSchema>;
+type FormData = z.infer<typeof eventEditSchema>;
 
-interface EventEditFormProps {
-  event: EventDetail;
-  onClose: () => void;
-  onUpdate: (updatedEvent: EventDetail) => void;
-  staffUsers: UserEvent[];
-  speakers: Speakers[];
-}
-
-export default function EventEditForm({ event, onClose, onUpdate, staffUsers, speakers }: EventEditFormProps) {
-  const [error, setError] = useState<string | null>(null);
+const EventEditForm = () => {
   const [isLoading, setIsLoading] = useState(false);
+  const router = useRouter();
+  const params = useParams();
+  const eventId = params.eventId as string;
+  const [event, setEvent] = useState<EventEditData | undefined>();
+  const { user: authUser, loading: authLoading, role: Role } = useAuth();
+  const [eventUsers, setEventUsers] = useState<User[]>([]);
+  const [eventSpeakers, setEventSpeakers] = useState<Speakers[]>([]);
 
-  // Initialize react-hook-form
-  const {
-    register,
-    handleSubmit,
-    formState: { errors, isSubmitting },
-    setValue,
-    reset,
-    watch,
-  } = useForm<FormData>({
-    resolver: zodResolver(eventSchema),
-    defaultValues: {
-      name: event.eventName,
-      dateTime: format(new Date(event.date), "yyyy-MM-dd'T'HH:mm"),
-      location: event.location,
-      isVirtual: event.isVirtual ?? false,
-      googleMapsLink: event.direction ?? "",
-      status: event.status,
-      image: event.image ?? "",
-      primaryColor: event.primaryColor ?? "#000000",
-      secondaryColor: event.secondaryColor ?? "#000000",
-      backgroundColor: event.backgroundColor ?? "#FFFFFF",
-      textColor: event.textColor ?? "#000000",
-      headingFont: event.headingFont ?? "Roboto",
-      bodyFont: event.bodyFont ?? "Roboto",
-      eventDesc: event.eventDesc ?? "",
-      agenda: event.agenda ?? "",
-      existingSpeakers: event.speakers ?? [],
-      ticketEnabled: event.ticketEnabled ?? false,
-      ticketPrice: event.ticketPrice ?? 0,
-      waitlistEnabled: event.waitlistEnabled ?? false,
-      waitlistLimit: event.waitlistLimit ?? 0,
-      category: event.category ?? "",
-      tags: event.tags?.join(", ") ?? "",
-      accessibilityInfo: event.accessibilityInfo ?? "",
-      contactEmail: event.contactEmail ?? "",
-      contactPhone: event.contactPhone ?? "",
-      assignedStaff: event.assignedStaff ?? [],
-      invitesOnly: event.invitesOnly ?? false,
-      maxAttendees: event.maxAttendees ?? 0,
-    },
-  });
-
-  // Handle image upload
-  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      try {
-        setValue("image", file);
-      } catch (err) {
-        setError("Failed to process image");
-      }
-    }
-  };
-
-  // Handle form submission
-  const onSubmit = async (data: FormData) => {
+  const fetchEvents = async () => {
     try {
       setIsLoading(true);
-      let downloadUrl = event.image || "";
-      if (data.image && data.image instanceof File) {
-        const imageRef = ref(storage, `events/${Date.now()}_${data.name}`);
-        const snapshot = await uploadBytes(imageRef, data.image);
-        downloadUrl = await getDownloadURL(snapshot.ref);
-      }
-
-      const cleanedData = {
-        eventName: data.name,
-        image: downloadUrl,
-        createdBy: event.createdBy,
-        assignedStaff: data.assignedStaff ?? [],
-        ticketSales: event.ticketSales,
-        totalRevenue: event.totalRevenue,
-        isInvitesOnly: data.invitesOnly ?? false,
-        maxAttendies: data.invitesOnly ? data.maxAttendees : null,
-        status: data.status,
-        location: data.location,
-        isVirtual: data.isVirtual ?? false,
-        date: data.dateTime,
-        direction: data.googleMapsLink ?? null,
-        primaryColor: data.primaryColor ?? null,
-        secondaryColor: data.secondaryColor ?? null,
-        backgroundColor: data.backgroundColor ?? null,
-        textColor: data.textColor ?? null,
-        headingFont: data.headingFont ?? null,
-        bodyFont: data.bodyFont ?? null,
-        eventDesc: data.eventDesc ?? null,
-        agenda: data.agenda ?? null,
-        speakers: data.existingSpeakers ?? [],
-        ticketEnabled: data.ticketEnabled ?? false,
-        ticketPrice: data.ticketPrice ?? null,
-        waitlistEnabled: data.waitlistEnabled ?? false,
-        waitlistLimit: data.waitlistLimit ?? null,
-        category: data.category ?? null,
-        tags: data.tags ? data.tags.split(",").map((t) => t.trim()) : [],
-        accessibilityInfo: data.accessibilityInfo ?? null,
-        contactEmail: data.contactEmail ?? null,
-        contactPhone: data.contactPhone ?? null,
-      };
-
-      const response = await fetch(`/api/events/event-management/${event.id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(cleanedData),
-      });
-
+      const response = await fetch(`/api/events/event-management/${eventId}`);
       if (!response.ok) {
-        const result = await response.json();
-        throw new Error(result.error || "Failed to update event");
+        throw new Error("Failed to fetch events");
       }
-
-      const updatedEvent = await response.json();
-      toast.success("Event Updated Successfully");
-      onUpdate(updatedEvent);
-      onClose();
-      reset();
-      setError(null);
-    } catch (err) {
-      toast.error("Failed to Update Event");
-      setError(err instanceof Error ? err.message : "Failed to update event");
+      const data = await response.json();
+      setEvent(data.event);
+    } catch (error) {
+      console.error("Error fetching Events:", error);
+      toast.error("Failed to load Events");
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Animation variants
+  const fetchUsers = async () => {
+    try {
+      setIsLoading(true);
+      const response = await fetch("/api/users");
+      if (!response.ok) {
+        throw new Error("Failed to fetch users");
+      }
+      const data = await response.json();
+      setEventUsers(data);
+    } catch (error) {
+      console.error("Error fetching Users:", error);
+      toast.error("Failed to load Users");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const fetchSpeakers = async () => {
+    try {
+      setIsLoading(true);
+      const response = await fetch("/api/speakers");
+      if (!response.ok) {
+        throw new Error("Failed to fetch Speakers");
+      }
+      const data = await response.json();
+      setEventSpeakers(data);
+    } catch (error) {
+      console.error("Error fetching Speakers:", error);
+      toast.error("Failed to load Speakers");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchEvents();
+    fetchUsers();
+    fetchSpeakers();
+  }, [eventId]);
+
+  const form = useForm<FormData>({
+    resolver: zodResolver(eventEditSchema),
+    defaultValues: {
+      eventName: "",
+      date: "",
+      location: "",
+      isVirtual: false,
+      direction: "",
+      status: "Draft",
+      image: null,
+      primaryColor: "#000000",
+      secondaryColor: "#000000",
+      backgroundColor: "#ffffff",
+      textColor: "#000000",
+      headingFont: "Roboto",
+      bodyFont: "Roboto",
+      eventDesc: "",
+      agenda: "",
+      speakers: [], // Initialize as empty array, will be updated in useEffect
+      ticketEnabled: false,
+      ticketPrice: null,
+      waitlistEnabled: false,
+      waitlistLimit: null,
+      category: undefined,
+      tags: "",
+      accessibilityInfo: "",
+      contactEmail: "",
+      contactPhone: "",
+      assignedStaff: [],
+      isInvitesOnly: false,
+      maxAttendees: null,
+    },
+  });
+
+  useEffect(() => {
+    if (event && eventSpeakers) {
+      const mappedSpeakers = event.speakers
+        ?.map(id => eventSpeakers.find(s => s.id === id))
+        .filter((s): s is Speakers => s !== undefined && s !== null && typeof s.id === "string") || [];
+      form.reset({
+        eventName: event.eventName || "",
+        date: event.date || "",
+        location: event.location || "",
+        isVirtual: event.isVirtual || false,
+        direction: event.direction || "",
+        status: event.status || "Draft",
+        image: event.image || null,
+        primaryColor: event.primaryColor || "#000000",
+        secondaryColor: event.secondaryColor || "#000000",
+        backgroundColor: event.backgroundColor || "#ffffff",
+        textColor: event.textColor || "#000000",
+        headingFont: event.headingFont || "Roboto",
+        bodyFont: event.bodyFont || "Roboto",
+        eventDesc: event.eventDesc || "",
+        agenda: event.agenda || "",
+        speakers: mappedSpeakers, // Map IDs to full speaker objects
+        ticketEnabled: event.ticketEnabled || false,
+        ticketPrice: event.ticketPrice || null,
+        waitlistEnabled: event.waitlistEnabled || false,
+        waitlistLimit: event.waitlistLimit || null,
+        category: event.category || undefined,
+        tags: event.tags || "",
+        accessibilityInfo: event.accessibilityInfo || "",
+        contactEmail: event.contactEmail || "",
+        contactPhone: event.contactPhone || "",
+        assignedStaff: event.assignedStaff || [],
+        isInvitesOnly: event.isInvitesOnly || false,
+        maxAttendees: event.maxAttendees || null, // Fix typo from Firebase
+        createdAt: event.createdAt || undefined,
+        createdBy: event.createdBy || "",
+        eventId: event.eventId || eventId,
+      });
+    }
+  }, [event, eventSpeakers, form, eventId]);
+
+  useEffect(() => {
+    if (event && eventSpeakers) {
+      const mappedSpeakers = event.speakers
+        ?.map(id => eventSpeakers.find(s => s.id === id))
+        .filter((s): s is Speakers => s !== undefined && s !== null && typeof s.id === "string") || [];
+      form.reset({
+        eventName: event.eventName || "",
+        date: event.date || "",
+        location: event.location || "",
+        isVirtual: event.isVirtual || false,
+        direction: event.direction || "",
+        status: event.status || "Draft",
+        image: event.image || null,
+        primaryColor: event.primaryColor || "#000000",
+        secondaryColor: event.secondaryColor || "#000000",
+        backgroundColor: event.backgroundColor || "#ffffff",
+        textColor: event.textColor || "#000000",
+        headingFont: event.headingFont || "Roboto",
+        bodyFont: event.bodyFont || "Roboto",
+        eventDesc: event.eventDesc || "",
+        agenda: event.agenda || "",
+        speakers: mappedSpeakers, // Explicitly set to array of objects
+        ticketEnabled: event.ticketEnabled || false,
+        ticketPrice: event.ticketPrice || null,
+        waitlistEnabled: event.waitlistEnabled || false,
+        waitlistLimit: event.waitlistLimit || null,
+        category: event.category || undefined,
+        tags: event.tags || "",
+        accessibilityInfo: event.accessibilityInfo || "",
+        contactEmail: event.contactEmail || "",
+        contactPhone: event.contactPhone || "",
+        assignedStaff: event.assignedStaff || [],
+        isInvitesOnly: event.isInvitesOnly || false,
+        maxAttendees: event.maxAttendees ?? null, // Fix typo from Firebase
+        createdAt: event.createdAt || undefined,
+        createdBy: event.createdBy || "",
+        eventId: event.eventId || eventId,
+      });
+    }
+  }, [event, eventSpeakers, form, eventId]);
+
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      try {
+        form.setValue("image", file);
+      } catch (err) {
+        toast.error("Failed to process image");
+      }
+    }
+  };
+
+  const onSubmit = async (data: FormData) => {
+    console.log("Submitted Data", data);
+  };
+
   const formVariants = {
     hidden: { opacity: 0, height: 0 },
     visible: {
@@ -243,618 +317,868 @@ export default function EventEditForm({ event, onClose, onUpdate, staffUsers, sp
     },
   };
 
-  return (
-    <AnimatePresence>
-      <motion.div
-        className="bg-[rgba(255,215,0,0.2)] backdrop-blur-md rounded-lg p-6 mb-6 shadow-[0_4px_12px_rgba(106,13,173,0.3)] text-[#6A0DAD]"
-        variants={formVariants}
-        initial="hidden"
-        animate="visible"
-        exit="exit"
-        role="form"
-        aria-labelledby="edit-event-form-title"
-      >
-        <div className="flex justify-between items-center mb-4">
-          <h2 id="edit-event-form-title" className="text-xl font-bold">
-            Edit Event: {event.eventName}
-          </h2>
-          <button
-            onClick={onClose}
-            className="text-[#6A0DAD] hover:text-[#7B17C0]"
-            aria-label="Close edit event form"
-          >
-            <FiChevronDown size={24} aria-hidden="true" />
-          </button>
+  const buttonVariants = {
+    hover: {
+      scale: 1.05,
+      boxShadow: "0 4px 12px rgba(106, 13, 173, 0.5)",
+      transition: { duration: 0.2 },
+    },
+    tap: { scale: 0.95, transition: { duration: 0.1 } },
+  };
+
+  if (authLoading || isLoading) {
+    return (
+      <div className="max-w-4xl mx-auto p-6">
+        <div className="bg-white/5 backdrop-blur-sm p-6 rounded-xl shadow-lg animate-pulse border border-white/10">
+
+          {/* Icon and Page Title Placeholder */}
+          <div className="flex items-center space-x-3 mb-8">
+            <Settings className="h-6 w-6 text-gray-400 animate-spin" />
+            <div className="h-6 bg-gray-300/30 rounded w-1/4" />
+          </div>
+
+          {/* Event Edit Form Skeleton */}
+          <div className="space-y-6">
+            {/* Event Title Input */}
+            <div>
+              <div className="h-4 bg-gray-400/50 rounded w-1/4 mb-2"></div>
+              <div className="h-10 bg-gray-300/30 rounded w-full"></div>
+            </div>
+
+            {/* Event Date and Time Inputs */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <div className="h-4 bg-gray-400/50 rounded w-1/4 mb-2"></div>
+                <div className="h-10 bg-gray-300/30 rounded w-full"></div>
+              </div>
+              <div>
+                <div className="h-4 bg-gray-400/50 rounded w-1/4 mb-2"></div>
+                <div className="h-10 bg-gray-300/30 rounded w-full"></div>
+              </div>
+            </div>
+
+            {/* Event Location Input */}
+            <div>
+              <div className="h-4 bg-gray-400/50 rounded w-1/4 mb-2"></div>
+              <div className="h-10 bg-gray-300/30 rounded w-full"></div>
+            </div>
+
+            {/* Image Upload Preview */}
+            <div>
+              <div className="h-4 bg-gray-400/50 rounded w-1/4 mb-2"></div>
+              <div className="h-48 bg-gray-300/30 rounded-lg"></div>
+            </div>
+
+            {/* Description Textarea */}
+            <div>
+              <div className="h-4 bg-gray-400/50 rounded w-1/4 mb-2"></div>
+              <div className="space-y-2">
+                <div className="h-4 bg-gray-300/30 rounded w-full"></div>
+                <div className="h-4 bg-gray-300/30 rounded w-5/6"></div>
+                <div className="h-4 bg-gray-300/30 rounded w-3/4"></div>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex space-x-4 pt-4">
+              <div className="h-10 w-32 bg-gray-300/30 rounded"></div>
+              <div className="h-10 w-32 bg-gray-300/30 rounded"></div>
+            </div>
+          </div>
         </div>
-        {error && <p className="text-red-500 mb-4" role="alert">{error}</p>}
-        <form onSubmit={handleSubmit(onSubmit)} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Event Name */}
-          <div>
-            <label htmlFor="name" className="block text-sm font-medium">
-              Event Name
-            </label>
-            <input
-              id="name"
-              {...register("name")}
-              className="input input-bordered w-full bg-white text-[#6A0DAD]"
-              placeholder="Enter event name"
-              aria-invalid={errors.name ? "true" : "false"}
-            />
-            {errors.name && (
-              <p className="text-red-500 text-sm" role="alert">
-                {errors.name.message}
-              </p>
-            )}
-          </div>
+      </div>
 
-          {/* Date & Time */}
-          <div>
-            <label htmlFor="dateTime" className="block text-sm font-medium">
-              Date & Time
-            </label>
-            <input
-              id="dateTime"
-              type="datetime-local"
-              {...register("dateTime")}
-              className="input input-bordered w-full bg-white text-[#6A0DAD]"
-              aria-invalid={errors.dateTime ? "true" : "false"}
-            />
-            {errors.dateTime && (
-              <p className="text-red-500 text-sm" role="alert">
-                {errors.dateTime.message}
-              </p>
-            )}
-          </div>
+    );
+  }
 
-          {/* Location */}
-          <div>
-            <label htmlFor="location" className="block text-sm font-medium">
-              Location
-            </label>
-            <input
-              id="location"
-              {...register("location")}
-              className="input input-bordered w-full bg-white text-[#6A0DAD]"
-              placeholder="Enter location or virtual link"
-              aria-invalid={errors.location ? "true" : "false"}
-            />
-            {errors.location && (
-              <p className="text-red-500 text-sm" role="alert">
-                {errors.location.message}
-              </p>
-            )}
-          </div>
-
-          {/* Virtual Event */}
-          <div>
-            <label htmlFor="isVirtual" className="block text-sm font-medium">
-              Virtual Event
-            </label>
-            <input
-              id="isVirtual"
-              type="checkbox"
-              {...register("isVirtual")}
-              className="checkbox checkbox-bordered bg-white text-[#6A0DAD]"
-              aria-invalid={errors.isVirtual ? "true" : "false"}
-            />
-            {errors.isVirtual && (
-              <p className="text-red-500 text-sm" role="alert">
-                {errors.isVirtual.message}
-              </p>
-            )}
-          </div>
-
-          {/* Map Coordinates (for non-virtual events) */}
-          {!watch("isVirtual") && (
-            <div>
-              <label htmlFor="googleMapsLink" className="block text-sm font-medium">
-                Google Maps Link
-              </label>
-              <input
-                id="googleMapsLink"
-                type="url"
-                {...register("googleMapsLink")}
-                className="input input-bordered w-full bg-white text-[#6A0DAD]"
-                placeholder="Enter Google Maps link (e.g., https://www.google.com/maps/...)"
-                aria-invalid={errors.googleMapsLink ? "true" : "false"}
+  return (
+    <div className="container mx-auto p-6">
+      <AnimatePresence>
+        <motion.div
+          className="bg-[rgba(255,215,0,0.2)] backdrop-blur-md rounded-lg p-6 mb-6 shadow-[0_4px_12px_rgba(106,13,173,0.3)] text-[#6A0DAD]"
+          variants={formVariants}
+          initial="hidden"
+          animate="visible"
+          exit="exit"
+          role="form"
+          aria-labelledby="add-event-form-title"
+        >
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Event Name */}
+              <FormField
+                control={form.control}
+                name="eventName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Event Name</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="Enter event name"
+                        className="bg-white text-[#6A0DAD]"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-              {errors.googleMapsLink && (
-                <p className="text-red-500 text-sm" role="alert">
-                  {errors.googleMapsLink.message}
-                </p>
-              )}
-            </div>
-          )}
 
-          {/* Status */}
-          <div>
-            <label htmlFor="status" className="block text-sm font-medium">
-              Status
-            </label>
-            <select
-              id="status"
-              {...register("status")}
-              className="select select-bordered w-full bg-white text-[#6A0DAD]"
-              aria-invalid={errors.status ? "true" : "false"}
-            >
-              <option value="Draft">Draft</option>
-              <option value="Published">Published</option>
-              <option value="Unpublished">Unpublished</option>
-            </select>
-            {errors.status && (
-              <p className="text-red-500 text-sm" role="alert">
-                {errors.status.message}
-              </p>
-            )}
-          </div>
-
-          {/* Event Image */}
-          <div>
-            <label htmlFor="image" className="block text-sm font-medium">
-              Event Image
-            </label>
-            <input
-              id="image"
-              type="file"
-              accept="image/*"
-              onChange={handleImageChange}
-              className="file-input file-input-bordered w-full bg-white text-[#6A0DAD]"
-              aria-invalid={errors.image ? "true" : "false"}
-            />
-            {errors.image && (
-              <p className="text-red-500 text-sm" role="alert">
-                {errors.image.message}
-              </p>
-            )}
-          </div>
-
-          {/* Theme Settings */}
-          <div className="md:col-span-2">
-            <h3 className="text-lg font-medium mb-2">Theme Customization</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="primaryColor" className="block text-sm font-medium">
-                  Primary Color
-                </label>
-                <input
-                  id="primaryColor"
-                  type="color"
-                  {...register("primaryColor")}
-                  className="input input-bordered w-full bg-white"
-                  aria-invalid={errors.primaryColor ? "true" : "false"}
-                />
-                {errors.primaryColor && (
-                  <p className="text-red-500 text-sm" role="alert">
-                    {errors.primaryColor.message}
-                  </p>
+              {/* Date & Time */}
+              <FormField
+                control={form.control}
+                name="date"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Date & Time</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="datetime-local"
+                        className="bg-white text-[#6A0DAD]"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
                 )}
-              </div>
-              <div>
-                <label htmlFor="secondaryColor" className="block text-sm font-medium">
-                  Secondary Color
-                </label>
-                <input
-                  id="secondaryColor"
-                  type="color"
-                  {...register("secondaryColor")}
-                  className="input input-bordered w-full bg-white"
-                  aria-invalid={errors.secondaryColor ? "true" : "false"}
-                />
-                {errors.secondaryColor && (
-                  <p className="text-red-500 text-sm" role="alert">
-                    {errors.secondaryColor.message}
-                  </p>
-                )}
-              </div>
-              <div>
-                <label htmlFor="backgroundColor" className="block text-sm font-medium">
-                  Background Color
-                </label>
-                <input
-                  id="backgroundColor"
-                  type="color"
-                  {...register("backgroundColor")}
-                  className="input input-bordered w-full bg-white"
-                  aria-invalid={errors.backgroundColor ? "true" : "false"}
-                />
-                {errors.backgroundColor && (
-                  <p className="text-red-500 text-sm" role="alert">
-                    {errors.backgroundColor.message}
-                  </p>
-                )}
-              </div>
-              <div>
-                <label htmlFor="textColor" className="block text-sm font-medium">
-                  Text Color
-                </label>
-                <input
-                  id="textColor"
-                  type="color"
-                  {...register("textColor")}
-                  className="input input-bordered w-full bg-white"
-                  aria-invalid={errors.textColor ? "true" : "false"}
-                />
-                {errors.textColor && (
-                  <p className="text-red-500 text-sm" role="alert">
-                    {errors.textColor.message}
-                  </p>
-                )}
-              </div>
-              <div>
-                <label htmlFor="headingFont" className="block text-sm font-medium">
-                  Heading Font
-                </label>
-                <select
-                  id="headingFont"
-                  {...register("headingFont")}
-                  className="select select-bordered w-full bg-white text-[#6A0DAD]"
-                  aria-invalid={errors.headingFont ? "true" : "false"}
-                >
-                  <option value="Roboto">Roboto</option>
-                  <option value="Open Sans">Open Sans</option>
-                  <option value="Montserrat">Montserrat</option>
-                  <option value="Lora">Lora</option>
-                </select>
-                {errors.headingFont && (
-                  <p className="text-red-500 text-sm" role="alert">
-                    {errors.headingFont.message}
-                  </p>
-                )}
-              </div>
-              <div>
-                <label htmlFor="bodyFont" className="block text-sm font-medium">
-                  Body Font
-                </label>
-                <select
-                  id="bodyFont"
-                  {...register("bodyFont")}
-                  className="select select-bordered w-full bg-white text-[#6A0DAD]"
-                  aria-invalid={errors.bodyFont ? "true" : "false"}
-                >
-                  <option value="Roboto">Roboto</option>
-                  <option value="Open Sans">Open Sans</option>
-                  <option value="Montserrat">Montserrat</option>
-                  <option value="Lora">Lora</option>
-                </select>
-                {errors.bodyFont && (
-                  <p className="text-red-500 text-sm" role="alert">
-                    {errors.bodyFont.message}
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Description */}
-          <div className="md:col-span-2">
-            <label htmlFor="description" className="block text-sm font-medium">
-              Event Description
-            </label>
-            <textarea
-              id="description"
-              {...register("eventDesc")}
-              className="textarea textarea-bordered w-full bg-white text-[#6A0DAD]"
-              placeholder="Enter event description"
-              rows={4}
-              aria-invalid={errors.eventDesc ? "true" : "false"}
-            />
-            {errors.eventDesc && (
-              <p className="text-red-500 text-sm" role="alert">
-                {errors.eventDesc.message}
-              </p>
-            )}
-          </div>
-
-          {/* Agenda */}
-          <div className="md:col-span-2">
-            <label htmlFor="agenda" className="block text-sm font-medium">
-              Agenda (Optional)
-            </label>
-            <textarea
-              id="agenda"
-              {...register("agenda")}
-              className="textarea textarea-bordered w-full bg-white text-[#6A0DAD]"
-              placeholder="Enter agenda or timeline (e.g., 9:00 AM - Welcome, 10:00 AM - Keynote)"
-              rows={4}
-              aria-invalid={errors.agenda ? "true" : "false"}
-            />
-            {errors.agenda && (
-              <p className="text-red-500 text-sm" role="alert">
-                {errors.agenda.message}
-              </p>
-            )}
-          </div>
-
-          {/* Existing Speakers */}
-          <div className="md:col-span-2">
-            <label htmlFor="existingSpeakers" className="block text-sm font-medium">
-              Select Existing Speakers
-            </label>
-            <Select
-              isMulti
-              options={(speakers || []).map((speaker) => ({
-                label: speaker.speakerName,
-                value: speaker.speakerName,
-              }))}
-              defaultValue={event.speakers?.map((s) => ({ label: s, value: s }))}
-              onChange={(selected) =>
-                setValue("existingSpeakers", selected ? selected.map((s) => s.value) : [])
-              }
-              className="basic-multi-select"
-              classNamePrefix="select"
-              placeholder="Select speakers..."
-            />
-            {errors.existingSpeakers && (
-              <p className="text-red-500 text-sm" role="alert">
-                {errors.existingSpeakers.message}
-              </p>
-            )}
-          </div>
-
-          {/* Ticket Settings */}
-          <div className="md:col-span-2">
-            <h3 className="text-lg font-medium mb-2">Ticket Settings</h3>
-            <div>
-              <label htmlFor="ticketEnabled" className="block text-sm font-medium">
-                Enable Tickets
-              </label>
-              <input
-                id="ticketEnabled"
-                type="checkbox"
-                {...register("ticketEnabled")}
-                className="checkbox checkbox-bordered bg-white text-[#6A0DAD]"
-                aria-invalid={errors.ticketEnabled ? "true" : "false"}
               />
-              {errors.ticketEnabled && (
-                <p className="text-red-500 text-sm" role="alert">
-                  {errors.ticketEnabled.message}
-                </p>
-              )}
-            </div>
-            {watch("ticketEnabled") && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
-                <div>
-                  <label htmlFor="ticketPrice" className="block text-sm font-medium">
-                    Ticket Price
-                  </label>
-                  <input
-                    id="ticketPrice"
-                    type="number"
-                    step="0.01"
-                    {...register("ticketPrice", { valueAsNumber: true })}
-                    className="input input-bordered w-full bg-white text-[#6A0DAD]"
-                    placeholder="Enter ticket price"
-                    aria-invalid={errors.ticketPrice ? "true" : "false"}
-                  />
-                  {errors.ticketPrice && (
-                    <p className="text-red-500 text-sm" role="alert">
-                      {errors.ticketPrice.message}
-                    </p>
+
+              {/* Location */}
+              <FormField
+                control={form.control}
+                name="location"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Location</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="Enter location or virtual link"
+                        className="bg-white text-[#6A0DAD]"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Virtual Event */}
+              <FormField
+                control={form.control}
+                name="isVirtual"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                    <FormControl>
+                      <Checkbox
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                        className="bg-white text-[#6A0DAD]"
+                      />
+                    </FormControl>
+                    <div className="space-y-1 leading-none">
+                      <FormLabel>Virtual Event</FormLabel>
+                    </div>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Map Coordinates (for non-virtual events) */}
+              {!form.watch("isVirtual") && (
+                <FormField
+                  control={form.control}
+                  name="direction"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Google Maps Link</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="url"
+                          placeholder="Enter Google Maps link (e.g., https://www.google.com/maps/...)"
+                          className="bg-white text-[#6A0DAD]"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
                   )}
+
+                />
+              )}
+
+              {/* Status */}
+              <FormField
+                control={form.control}
+                name="status"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Status</FormLabel>
+                    <FormControl>
+                      <ShadcnSelect
+                        onValueChange={field.onChange}
+                        value={field.value}
+                      >
+                        <SelectTrigger className="bg-white text-[#6A0DAD]">
+                          <SelectValue placeholder="Select status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Draft">Draft</SelectItem>
+                          <SelectItem value="Published">Published</SelectItem>
+                          <SelectItem value="Unpublished">Unpublished</SelectItem>
+                          <SelectItem value="Ongoing">Ongoing</SelectItem>
+                          <SelectItem value="Cancelled">Cancelled</SelectItem>
+                          <SelectItem value="Completed">Completed</SelectItem>
+                        </SelectContent>
+                      </ShadcnSelect>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Event Image */}
+              <FormField
+                control={form.control}
+                name="image"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Event Image</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageChange}
+                        className="bg-white text-[#6A0DAD]"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Theme Settings */}
+              <div className="md:col-span-2">
+                <h3 className="text-lg font-medium mb-2">Theme Customization</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="primaryColor"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Primary Color</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="color"
+                            className="bg-white"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="secondaryColor"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Secondary Color</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="color"
+                            className="bg-white"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="backgroundColor"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Background Color</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="color"
+                            className="bg-white"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="textColor"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Text Color</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="color"
+                            className="bg-white"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="headingFont"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Heading Font</FormLabel>
+                        <FormControl>
+                          <ShadcnSelect
+                            onValueChange={field.onChange}
+                            value={field.value}
+                          >
+                            <SelectTrigger className="bg-white text-[#6A0DAD]">
+                              <SelectValue placeholder="Select heading font" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Roboto">Roboto</SelectItem>
+                              <SelectItem value="Open Sans">Open Sans</SelectItem>
+                              <SelectItem value="Montserrat">Montserrat</SelectItem>
+                              <SelectItem value="Lora">Lora</SelectItem>
+                            </SelectContent>
+                          </ShadcnSelect>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="bodyFont"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Body Font</FormLabel>
+                        <FormControl>
+                          <ShadcnSelect
+                            onValueChange={field.onChange}
+                            value={field.value}
+                          >
+                            <SelectTrigger className="bg-white text-[#6A0DAD]">
+                              <SelectValue placeholder="Select body font" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Roboto">Roboto</SelectItem>
+                              <SelectItem value="Open Sans">Open Sans</SelectItem>
+                              <SelectItem value="Montserrat">Montserrat</SelectItem>
+                              <SelectItem value="Lora">Lora</SelectItem>
+                            </SelectContent>
+                          </ShadcnSelect>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                 </div>
               </div>
-            )}
-          </div>
 
-          {/* Waitlist Settings */}
-          <div>
-            <label htmlFor="waitlistEnabled" className="block text-sm font-medium">
-              Enable Waitlist
-            </label>
-            <input
-              id="waitlistEnabled"
-              type="checkbox"
-              {...register("waitlistEnabled")}
-              className="checkbox checkbox-bordered bg-white text-[#6A0DAD]"
-              aria-invalid={errors.waitlistEnabled ? "true" : "false"}
-            />
-            {errors.waitlistEnabled && (
-              <p className="text-red-500 text-sm" role="alert">
-                {errors.waitlistEnabled.message}
-              </p>
-            )}
-          </div>
-          {watch("waitlistEnabled") && (
-            <div>
-              <label htmlFor="waitlistLimit" className="block text-sm font-medium">
-                Waitlist Limit
-              </label>
-              <input
-                id="waitlistLimit"
-                type="number"
-                {...register("waitlistLimit", { valueAsNumber: true })}
-                className="input input-bordered w-full bg-white text-[#6A0DAD]"
-                placeholder="Enter waitlist limit"
-                aria-invalid={errors.waitlistLimit ? "true" : "false"}
+              {/* Description */}
+              <FormField
+                control={form.control}
+                name="eventDesc"
+                render={({ field }) => (
+                  <FormItem className="md:col-span-2">
+                    <FormLabel>Event Description</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Enter event description"
+                        className="bg-white text-[#6A0DAD]"
+                        rows={4}
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-              {errors.waitlistLimit && (
-                <p className="text-red-500 text-sm" role="alert">
-                  {errors.waitlistLimit.message}
-                </p>
-              )}
-            </div>
-          )}
 
-          {/* Category */}
-          <div>
-            <label htmlFor="category" className="block text-sm font-medium">
-              Category
-            </label>
-            <select
-              id="category"
-              {...register("category")}
-              className="select select-bordered w-full bg-white text-[#6A0DAD]"
-              aria-invalid={errors.category ? "true" : "false"}
-            >
-              <option value="">Select a category</option>
-              <option value="Conference">Conference</option>
-              <option value="Workshop">Workshop</option>
-              <option value="Concert">Concert</option>
-              <option value="Networking">Networking</option>
-            </select>
-            {errors.category && (
-              <p className="text-red-500 text-sm" role="alert">
-                {errors.category.message}
-              </p>
-            )}
-          </div>
-
-          {/* Tags */}
-          <div>
-            <label htmlFor="tags" className="block text-sm font-medium">
-              Tags
-            </label>
-            <input
-              id="tags"
-              {...register("tags")}
-              className="input input-bordered w-full bg-white text-[#6A0DAD]"
-              placeholder="Enter tags (e.g., tech, free, networking)"
-              aria-invalid={errors.tags ? "true" : "false"}
-            />
-            {errors.tags && (
-              <p className="text-red-500 text-sm" role="alert">
-                {errors.tags.message}
-              </p>
-            )}
-          </div>
-
-          {/* Accessibility Information */}
-          <div className="md:col-span-2">
-            <label htmlFor="accessibilityInfo" className="block text-sm font-medium">
-              Accessibility Information (Optional)
-            </label>
-            <textarea
-              id="accessibilityInfo"
-              {...register("accessibilityInfo")}
-              className="textarea textarea-bordered w-full bg-white text-[#6A0DAD]"
-              placeholder="e.g., Wheelchair accessible, sign language interpreter available"
-              rows={3}
-              aria-invalid={errors.accessibilityInfo ? "true" : "false"}
-            />
-            {errors.accessibilityInfo && (
-              <p className="text-red-500 text-sm" role="alert">
-                {errors.accessibilityInfo.message}
-              </p>
-            )}
-          </div>
-
-          {/* Contact Information */}
-          <div>
-            <label htmlFor="contactEmail" className="block text-sm font-medium">
-              Organizer Email
-            </label>
-            <input
-              id="contactEmail"
-              type="email"
-              {...register("contactEmail")}
-              className="input input-bordered w-full bg-white text-[#6A0DAD]"
-              placeholder="Enter organizer email"
-              aria-invalid={errors.contactEmail ? "true" : "false"}
-            />
-            {errors.contactEmail && (
-              <p className="text-red-500 text-sm" role="alert">
-                {errors.contactEmail.message}
-              </p>
-            )}
-          </div>
-          <div>
-            <label htmlFor="contactPhone" className="block text-sm font-medium">
-              Organizer Phone (Optional)
-            </label>
-            <input
-              id="contactPhone"
-              type="tel"
-              {...register("contactPhone")}
-              className="input input-bordered w-full bg-white text-[#6A0DAD]"
-              placeholder="Enter organizer phone"
-              aria-invalid={errors.contactPhone ? "true" : "false"}
-            />
-            {errors.contactPhone && (
-              <p className="text-red-500 text-sm" role="alert">
-                {errors.contactPhone.message}
-              </p>
-            )}
-          </div>
-
-          {/* Assigned Staff */}
-          <div>
-            <label htmlFor="assignedStaff" className="block text-sm font-medium">
-              Assigned Staff
-            </label>
-            <Select
-              isMulti
-              options={(staffUsers || []).map((user) => ({ value: user.id, label: user.name }))}
-              defaultValue={event.assignedStaff?.map((id) => {
-                const user = staffUsers.find((u) => u.id === id);
-                return { value: id, label: user?.name || "Unknown" };
-              })}
-              onChange={(selected) =>
-                setValue("assignedStaff", selected ? selected.map((s) => s.value) : [])
-              }
-              className="basic-multi-select"
-              classNamePrefix="select"
-            />
-          </div>
-
-          {/* Invites Only */}
-          <div>
-            <label htmlFor="invitesOnly" className="block text-sm font-medium">
-              Invites Only
-            </label>
-            <input
-              id="invitesOnly"
-              type="checkbox"
-              {...register("invitesOnly")}
-              className="checkbox checkbox-bordered bg-white text-[#6A0DAD]"
-            />
-          </div>
-
-          {/* Max Attendees */}
-          {watch("invitesOnly") && (
-            <div>
-              <label htmlFor="maxAttendees" className="block text-sm font-medium">
-                Max Attendees
-              </label>
-              <input
-                id="maxAttendees"
-                type="number"
-                {...register("maxAttendees", { valueAsNumber: true })}
-                className="input input-bordered w-full bg-white text-[#6A0DAD]"
-                placeholder="Enter max attendees"
+              {/* Agenda */}
+              <FormField
+                control={form.control}
+                name="agenda"
+                render={({ field }) => (
+                  <FormItem className="md:col-span-2">
+                    <FormLabel>Agenda (Optional, can be detailed later)</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Enter agenda or timeline (e.g., 9:00 AM - Welcome, 10:00 AM - Keynote)"
+                        className="bg-white text-[#6A0DAD]"
+                        rows={4}
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-              {errors.maxAttendees && (
-                <p className="text-red-500 text-sm" role="alert">
-                  {errors.maxAttendees.message}
-                </p>
-              )}
-            </div>
-          )}
 
-          {/* Submit and Cancel Buttons */}
-          <div className="md:col-span-2 flex gap-4">
-            <button
-              type="submit"
-              disabled={isSubmitting || isLoading}
-              className="btn bg-[#6A0DAD] text-white hover:bg-[#FFD700] hover:text-[#6A0DAD] disabled:opacity-50"
-              aria-label={isSubmitting || isLoading ? "Saving event" : "Save event"}
-            >
-              {isSubmitting || isLoading ? "Saving..." : "Save Changes"}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                onClose();
-                reset();
-                setError(null);
-              }}
-              className="btn bg-gray-500 text-white hover:bg-gray-600"
-              aria-label="Cancel editing event"
-            >
-              Cancel
-            </button>
-          </div>
-        </form>
-      </motion.div>
-    </AnimatePresence>
+              {/* Speakers */}
+              <FormField
+                control={form.control}
+                name="speakers"
+                render={({ field }) => (
+                  <FormItem className="md:col-span-2">
+                    <FormLabel>Speakers</FormLabel>
+                    <div className="mb-2">
+                      {field?.value?.length > 0 ? (
+                        <div className="flex flex-wrap gap-2">
+                          {field?.value.map((speaker, index) => (
+                            <div
+                              key={speaker.id}
+                              className="bg-white text-[#6A0DAD] px-3 py-1 rounded-full border border-[#6A0DAD] flex items-center"
+                            >
+                              <span>{speaker.speakerName}</span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const updatedSpeakers = field?.value.filter((_, i) => i !== index);
+                                  form.setValue("speakers", updatedSpeakers, { shouldValidate: true });
+                                }}
+                                className="ml-2 text-red-500 hover:text-red-700"
+                                aria-label={`Remove ${speaker.speakerName} from speakers`}
+                              >
+                                ×
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-gray-500">No speakers currently assigned</p>
+                      )}
+                    </div>
+                    <FormControl>
+                      <Select<SpeakerOption, true>
+                        isMulti
+                        options={eventSpeakers.map(speaker => ({
+                          value: speaker.id,
+                          label: speaker.speakerName,
+                        }))}
+                        value={[]}
+                        onChange={(selected) => {
+                          const selectedSpeakers = selected
+                            ?.filter((s): s is SpeakerOption => s !== null)
+                            .map(s => {
+                              const speaker = eventSpeakers.find(sp => sp.id === s.value);
+                              return {
+                                id: s.value,
+                                speakerName: speaker?.speakerName || "",
+                                description: speaker?.description || "",
+                                profileImage: speaker?.profileImage || null,
+                              };
+                            }) || [];
+                          const updatedSpeakers = [...(field.value || []), ...selectedSpeakers];
+                          form.setValue("speakers", updatedSpeakers, { shouldValidate: true });
+                        }}
+                        className="basic-multi-select"
+                        classNamePrefix="select"
+                        placeholder="Add more speakers..."
+                        noOptionsMessage={() => "No additional speakers available"}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Ticket Settings */}
+              <div className="md:col-span-2">
+                <h3 className="text-lg font-medium mb-2">Ticket Settings</h3>
+                <FormField
+                  control={form.control}
+                  name="ticketEnabled"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                      <FormControl>
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                          className="bg-white text-[#6A0DAD]"
+                        />
+                      </FormControl>
+                      <div className="space-y-1 leading-none">
+                        <FormLabel>Enable Tickets</FormLabel>
+                      </div>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                {form.watch("ticketEnabled") && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+                    <FormField
+                      control={form.control}
+                      name="ticketPrice"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Ticket Price</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              placeholder="Enter ticket price"
+                              className="bg-white text-[#6A0DAD]"
+                              {...field}
+                              value={field.value ?? ""}
+                              onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Waitlist Settings */}
+              <FormField
+                control={form.control}
+                name="waitlistEnabled"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                    <FormControl>
+                      <Checkbox
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                        className="bg-white text-[#6A0DAD]"
+                      />
+                    </FormControl>
+                    <div className="space-y-1 leading-none">
+                      <FormLabel>Enable Waitlist</FormLabel>
+                    </div>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              {form.watch("waitlistEnabled") && (
+                <FormField
+                  control={form.control}
+                  name="waitlistLimit"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Waitlist Limit</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          placeholder="Enter waitlist limit"
+                          className="bg-white text-[#6A0DAD]"
+                          {...field}
+                          value={field.value ?? ""}
+                          onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+
+              {/* Category */}
+              <FormField
+                control={form.control}
+                name="category"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Category</FormLabel>
+                    <FormControl>
+                      <ShadcnSelect
+                        onValueChange={field.onChange}
+                        value={field.value}
+                      >
+                        <SelectTrigger className="bg-white text-[#6A0DAD]">
+                          <SelectValue placeholder="Select a category" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Conference">Conference</SelectItem>
+                          <SelectItem value="Workshop">Workshop</SelectItem>
+                          <SelectItem value="Concert">Concert</SelectItem>
+                          <SelectItem value="Networking">Networking</SelectItem>
+                        </SelectContent>
+                      </ShadcnSelect>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Tags */}
+              <FormField
+                control={form.control}
+                name="tags"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Tags</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="Enter tags (e.g., tech, free, networking)"
+                        className="bg-white text-[#6A0DAD]"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Accessibility Information */}
+              <FormField
+                control={form.control}
+                name="accessibilityInfo"
+                render={({ field }) => (
+                  <FormItem className="md:col-span-2">
+                    <FormLabel>Accessibility Information (Optional)</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="e.g., Wheelchair accessible, sign language interpreter available"
+                        className="bg-white text-[#6A0DAD]"
+                        rows={3}
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Contact Information */}
+              <FormField
+                control={form.control}
+                name="contactEmail"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Organizer Email</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="email"
+                        placeholder="Enter organizer email"
+                        className="bg-white text-[#6A0DAD]"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="contactPhone"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Organizer Phone (Optional)</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="tel"
+                        placeholder="Enter organizer phone"
+                        className="bg-white text-[#6A0DAD]"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Assigned Staff */}
+              <FormField
+                control={form.control}
+                name="assignedStaff"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Assigned Staff</FormLabel>
+                    <div className="mb-2">
+                      {(field.value?.length ?? 0) > 0 ? (
+                        <div className="flex flex-wrap gap-2">
+                          {field?.value?.map((id, index) => {
+                            const user = eventUsers.find(u => u.id === id);
+                            return user ? (
+                              <div
+                                key={user.id}
+                                className="bg-white text-[#6A0DAD] px-3 py-1 rounded-full border border-[#6A0DAD] flex items-center"
+                              >
+                                <span>{user.name} ({user.role})</span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const updatedStaff = (field.value || []).filter(
+                                      staffId => staffId !== user.id
+                                    );
+                                    form.setValue("assignedStaff", updatedStaff, { shouldValidate: true });
+                                    setEvent(prev => {
+                                      if (!prev) return prev; // If prev is undefined, return as is
+                                      return {
+                                        ...prev,
+                                        assignedStaff: updatedStaff,
+                                        eventName: prev.eventName || "",
+                                        date: prev.date || "",
+                                        location: prev.location || "",
+                                        direction: prev.direction || "",
+                                        status: prev.status || "Draft",
+                                        primaryColor: prev.primaryColor || "#000000",
+                                        secondaryColor: prev.secondaryColor || "#000000",
+                                        backgroundColor: prev.backgroundColor || "#ffffff",
+                                        textColor: prev.textColor || "#000000",
+                                        headingFont: prev.headingFont || "Roboto",
+                                        bodyFont: prev.bodyFont || "Roboto",
+                                        eventDesc: prev.eventDesc || "",
+                                        agenda: prev.agenda || "",
+                                        tags: prev.tags || "",
+                                        accessibilityInfo: prev.accessibilityInfo || "",
+                                        contactEmail: prev.contactEmail || "",
+                                        contactPhone: prev.contactPhone || "",
+                                        createdBy: prev.createdBy || "",
+                                        eventId: prev.eventId || eventId,
+                                      };
+                                    });
+                                  }}
+                                  className="ml-2 text-red-500 hover:text-red-700"
+                                  aria-label={`Remove ${user.name} from assigned staff`}
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            ) : null;
+                          })}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-gray-500">No staff currently assigned</p>
+                      )}
+                    </div>
+                    <FormControl>
+                      <Select<StaffOption, true>
+                        isMulti
+                        options={eventUsers
+                          .filter(user =>
+                            ['organizer', 'staff'].includes(user.role.toLowerCase()) &&
+                            !field.value?.includes(user.id)
+                          )
+                          .map(user => ({
+                            value: user.id,
+                            label: `${user.name} (${user.role})`,
+                          }))}
+                        value={[]}
+                        onChange={(selected) => {
+                          const selectedValues = selected
+                            ?.filter((s): s is StaffOption => s !== null)
+                            .map(s => s.value) || [];
+                          const updatedStaff = [...(field.value || []), ...selectedValues];
+                          form.setValue("assignedStaff", updatedStaff, { shouldValidate: true });
+                          setEvent(prev => {
+                            if (!prev) return prev; // If prev is undefined, return as is
+                            return {
+                              ...prev,
+                              assignedStaff: updatedStaff,
+                              eventName: prev.eventName || "",
+                              date: prev.date || "",
+                              location: prev.location || "",
+                              direction: prev.direction || "",
+                              status: prev.status || "Draft",
+                              primaryColor: prev.primaryColor || "#000000",
+                              secondaryColor: prev.secondaryColor || "#000000",
+                              backgroundColor: prev.backgroundColor || "#ffffff",
+                              textColor: prev.textColor || "#000000",
+                              headingFont: prev.headingFont || "Roboto",
+                              bodyFont: prev.bodyFont || "Roboto",
+                              eventDesc: prev.eventDesc || "",
+                              agenda: prev.agenda || "",
+                              tags: prev.tags || "",
+                              accessibilityInfo: prev.accessibilityInfo || "",
+                              contactEmail: prev.contactEmail || "",
+                              contactPhone: prev.contactPhone || "",
+                              createdBy: prev.createdBy || "",
+                              eventId: prev.eventId || eventId,
+                            };
+                          });
+                        }}
+                        className="basic-multi-select"
+                        classNamePrefix="select"
+                        placeholder="Add more staff..."
+                        noOptionsMessage={() => "No additional staff available"}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Invites Only */}
+              <FormField
+                control={form.control}
+                name="isInvitesOnly"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                    <FormControl>
+                      <Checkbox
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                        className="bg-white text-[#6A0DAD]"
+                      />
+                    </FormControl>
+                    <div className="space-y-1 leading-none">
+                      <FormLabel>Invites Only</FormLabel>
+                    </div>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Max Attendees */}
+              {form.watch("isInvitesOnly") && (
+                <FormField
+                  control={form.control}
+                  name="maxAttendees"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Max Attendees</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          placeholder="Enter max attendees"
+                          className="bg-white text-[#6A0DAD]"
+                          {...field}
+                          value={field.value ?? ""}
+                          onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+
+              {/* Submit and Cancel Buttons */}
+              <div className="md:col-span-2 flex gap-4">
+                <motion.div
+                  whileHover="hover"
+                  whileTap="tap"
+                  variants={buttonVariants}
+                >
+                  <Button
+                    type="submit"
+                    disabled={form.formState.isSubmitting}
+                    className="bg-[#6A0DAD] text-white hover:bg-[#FFD700] hover:text-[#6A0DAD] disabled:opacity-50"
+                    aria-label={form.formState.isSubmitting ? "Saving event" : "Save event"}
+                    variant="default"
+                  >
+                    {form.formState.isSubmitting ? "Saving..." : "Save Event"}
+                  </Button>
+                </motion.div>
+              </div>
+            </form>
+          </Form>
+        </motion.div>
+      </AnimatePresence>
+    </div>
   );
-}
+};
+
+export default EventEditForm;

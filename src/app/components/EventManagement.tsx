@@ -56,7 +56,7 @@ const eventSchema = z
     accessibilityInfo: z.string().max(500, "Accessibility information is too long").optional(),
     contactEmail: z.string().email("Invalid email address").optional(),
     contactPhone: z.string().max(20, "Phone number is too long").optional(),
-    assignedStaff: z.array(z.string()),
+    assignedStaff: z.array(z.string()).optional(),
     invitesOnly: z.boolean(),
     maxAttendees: z.number().int().positive().optional(),
   })
@@ -186,8 +186,6 @@ export default function EventManagement() {
   } = useForm<FormData>({
     resolver: zodResolver(eventSchema),
   });
-
-  // Define getEventType before filteredEvents to avoid TDZ error
   const getEventType = (event: EventDetail) => {
     const now = new Date();
     const eventDate = new Date(event.date);
@@ -335,7 +333,7 @@ export default function EventManagement() {
         waitlistEnabled: data.waitlistEnabled ?? false,
         waitlistLimit: data.waitlistLimit ?? null, // Ensure waitlistLimit is null if undefined
         category: data.category ?? null,
-        tags: data.tags ?? [],
+        tags: data.tags ?? "",
         accessibilityInfo: data.accessibilityInfo ?? null,
         contactEmail: data.contactEmail ?? null,
         contactPhone: data.contactPhone ?? null,
@@ -423,12 +421,17 @@ export default function EventManagement() {
 
   if (authLoading || isLoading) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         {[...Array(6)].map((_, i) => (
-          <div key={i} className="bg-gray-200 p-6 rounded-lg animate-pulse">
-            <div className="h-4 bg-gray-300 rounded w-3/4 mb-2"></div>
-            <div className="h-4 bg-gray-300 rounded w-1/2 mb-2"></div>
-            <div className="h-4 bg-gray-300 rounded w-1/4"></div>
+          <div key={i} className="bg-white/5 backdrop-blur-sm p-4 rounded-xl shadow-lg animate-pulse border border-white/10">
+            <div className="h-40 bg-gray-300/30 rounded-lg mb-4"></div>
+            <div className="h-5 bg-gray-400/50 rounded w-3/4 mb-2"></div>
+            <div className="h-4 bg-gray-400/30 rounded w-1/2 mb-2"></div>
+            <div className="h-4 bg-gray-400/20 rounded w-2/3 mb-4"></div>
+            <div className="flex space-x-2">
+              <div className="h-8 w-20 bg-gray-300/30 rounded"></div>
+              <div className="h-8 w-20 bg-gray-300/30 rounded"></div>
+            </div>
           </div>
         ))}
       </div>
@@ -825,7 +828,7 @@ export default function EventManagement() {
                   isMulti
                   options={(speakers || []).map((speaker) => ({
                     label: speaker.speakerName,
-                    value: speaker.speakerName,
+                    value: speaker.id,
                   }))}
                   onChange={(selected) =>
                     setValue("existingSpeakers", selected ? selected.map((s) => s.value) : [])

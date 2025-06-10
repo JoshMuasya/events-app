@@ -96,6 +96,7 @@ export default function LoginForm() {
                                 id="password"
                                 type="password"
                                 placeholder="••••••••"
+                                autoComplete="current-password"
                                 className="bg-transparent flex-grow text-sm"
                                 {...register("password")}
                             />

@@ -1,5 +1,6 @@
 "use client"
 
+import EventEditForm from "@/app/components/EventEditForm";
 import { useParams } from "next/navigation";
 import React from 'react'
 
@@ -8,8 +9,8 @@ const page = () => {
     const eventId = params.eventId as string;
 
     return (
-        <div>
-            Edit {eventId}
+        <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-[#F7E7CE] via-[#FFD700] to-[#E5C07B] overflow-hidden px-4">
+            <EventEditForm eventId={eventId} />
         </div>
     )
 }

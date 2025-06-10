@@ -74,13 +74,13 @@ export interface EventDetail {
     contactPhone: string;
     contactEmail: string;
     accessibilityInfo: string;
-    tags: string[];
+    tags: string;
     category: "Conference" | "Workshop" | "Concert" | "Networking"
     waitlistLimit: number;
     waitlistEnabled: boolean;
     ticketPrice: number;
     ticketEnabled: boolean;
-    speakers: string[];
+    speakers: Speakers;
     agenda: string;
     eventDesc: string;
     bodyFont: "Roboto" | "Open Sans" | "Montserrat" | "Lora";
@@ -91,20 +91,55 @@ export interface EventDetail {
     primaryColor: string;
     direction: string;
     sponsors: Sponsors;
-    attendies: Attendies;
+    attendies: Attendees;
 }
+
+export type EventEditData = {
+  eventName: string;
+  date: string;
+  location: string;
+  isVirtual: boolean;
+  direction: string;
+  status: "Draft" | "Published" | "Unpublished" | "Ongoing" | "Cancelled" | "Completed";
+  image: string | null;
+  primaryColor: string;
+  secondaryColor: string;
+  backgroundColor: string;
+  textColor: string;
+  headingFont: "Roboto" | "Open Sans" | "Montserrat" | "Lora";
+  bodyFont: "Roboto" | "Open Sans" | "Montserrat" | "Lora";
+  eventDesc: string;
+  agenda: string | null;
+  speakers: string[]; // Firebase stores speaker IDs
+  ticketEnabled: boolean;
+  ticketPrice: number | null;
+  waitlistEnabled: boolean;
+  waitlistLimit: number | null;
+  category: "Conference" | "Workshop" | "Concert" | "Networking";
+  tags: string;
+  accessibilityInfo: string | null;
+  contactEmail: string;
+  contactPhone: string;
+  assignedStaff: string[];
+  isInvitesOnly: boolean;
+  maxAttendees: number | null;
+  createdAt: { seconds: number; nanoseconds: number } | null;
+  createdBy: string;
+  eventId: string;
+};
 
 export interface Sponsors {
     sponsorName: string;
     sponsorLogo: string;
 }
 
-export interface Attendies {
+export interface Attendees {
     maxAttendies: string;
     currentAttendies: string;
 }
 
 export interface Speakers {
+    id: string;
     speakerName: string;
     description: string;
     profileImage: string | null;
@@ -204,17 +239,27 @@ export interface EventLayoutProps {
 }
 
 export type RecommendedEventHook = {
-  id: string;
-  eventName: string;
-  date: string;
-  image?: string;
+    id: string;
+    eventName: string;
+    date: string;
+    image?: string;
 };
 
 export interface StaffEventActionsProps {
-  isStaff: boolean;
-  event: EventDetail;
-  handleEdit: () => void;
-  handleDelete: () => Promise<void>;
-  handleManageRsvps: () => void;
-  handleManageTickets: () => void;
+    isStaff: boolean;
+    event: EventDetail;
+    handleEdit: () => void;
+    handleDelete: () => Promise<void>;
+    handleManageRsvps: () => void;
+    handleManageTickets: () => void;
 }
+
+export type StaffOption = {
+    value: string;
+    label: string;
+};
+
+export type SpeakerOption = {
+  value: string;
+  label: string;
+};

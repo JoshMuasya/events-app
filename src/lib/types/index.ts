@@ -90,7 +90,7 @@ export interface EventDetail {
     secondaryColor: string;
     primaryColor: string;
     direction: string;
-    sponsors: Sponsors;
+    sponsors: string[];
     attendies: Attendees;
 }
 
@@ -129,6 +129,7 @@ export type EventEditData = {
 };
 
 export interface Sponsors {
+    sponsorId: string;
     sponsorName: string;
     sponsorLogo: string;
 }
@@ -160,7 +161,12 @@ export type EventHeaderProps = {
 };
 
 export type EventSponsorsProps = {
-    sponsors: EventDetail["sponsors"];
+    sponsors: string[];
+    secondaryColor: string;
+};
+
+export type EventSponsorsIdProps = {
+    sponsors: string[][];
 };
 
 export type EventDescriptionProps = {

@@ -161,13 +161,15 @@ export default function EventPage() {
 
     const isEventOver = new Date(event.date) < new Date();
 
+    console.log("Event", event.sponsors)
+
     return (
         <div
             className="container mx-auto p-6 m-6 flex flex-col justify-center align-middle items-center"
             style={{ color: event.textColor, fontFamily: event.bodyFont, backgroundColor: event.backgroundColor }}
         >
             <EventHeader event={event} liveData={liveData} />
-            <EventSponsors sponsors={event.sponsors} />
+            <EventSponsors sponsors={event.sponsors} secondaryColor={event.secondaryColor} />
             <EventDescription description={event.eventDesc} />
             <EventMap isVirtual={event.isVirtual} direction={event.direction} />
             <VirtualEventFeatures isVirtual={event.isVirtual} />

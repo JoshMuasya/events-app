@@ -15,12 +15,13 @@ import Select from "react-select";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import "react-big-calendar/lib/css/react-big-calendar.css";
-import { EventDetail, Speakers, UserEvent } from "@/lib/types";
+import { EventDetail, Speakers, Sponsors, UserEvent } from "@/lib/types";
 import { useAuth } from "@/lib/AuthContext";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import { storage } from "@/lib/firebase";
 import { format, isValid } from "date-fns";
 import AddSpeaker from "./AddSpeaker";
+import AddSponsor from "./AddSponsor";
 
 // Form schema for validation
 const eventSchema = z
@@ -45,6 +46,7 @@ const eventSchema = z
     eventDesc: z.string().max(1000, "Description is too long").optional(),
     agenda: z.string().max(2000, "Agenda is too long").optional(),
     existingSpeakers: z.array(z.string()).optional(),
+    sponsors: z.array(z.string()).optional(),
     ticketEnabled: z.boolean().optional(),
     ticketPrice: z.number().positive("Ticket price must be positive").optional(),
     waitlistEnabled: z.boolean().optional(),
@@ -95,6 +97,7 @@ export default function EventManagement() {
   const [events, setEvents] = useState<EventDetail[]>([]);
   const [isAddingEvent, setIsAddingEvent] = useState(false);
   const [isAddingSpeaker, setIsAddingSpeaker] = useState(false);
+  const [isAddingSponsor, setIsAddingSponsor] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -105,6 +108,7 @@ export default function EventManagement() {
   const { user: authUser, loading: authLoading, role: Role } = useAuth();
   const eventsPerPage = 10;
   const [speakers, setSpeakers] = useState<Speakers[]>([])
+  const [sponsors, setSponsors] = useState<Sponsors[]>([])
 
   // Fetch Events
   const fetchEvents = async () => {
@@ -163,11 +167,34 @@ export default function EventManagement() {
     }
   }
 
+  // Fetch Sponsors
+  const fetchSponsors = async () => {
+    try {
+      setIsLoading(true);
+      const response = await fetch("/api/sponsors");
+      if (!response.ok) {
+        throw new Error("Failed to fetch Sponsors");
+      }
+      const sponsorsData = await response.json();
+      setSponsors(Array.isArray(sponsorsData) ? sponsorsData : [])
+
+    } catch (error) {
+      console.error("Error fetching sponsors:", error);
+      toast.error("Failed to load sponsors");
+      setSponsors([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
   useEffect(() => {
     fetchEvents();
     fetchUsers();
     fetchSpeakers();
+    fetchSponsors();
   }, []);
+
+  console.log("Sponsors", sponsors)
 
   const isAdmin = Role === "Admin";
 
@@ -328,6 +355,7 @@ export default function EventManagement() {
         eventDesc: data.eventDesc ?? null,
         agenda: data.agenda ?? null,
         speakers: data.existingSpeakers ?? [],
+        sponsors: data.sponsors ?? [],
         ticketEnabled: data.ticketEnabled ?? false,
         ticketPrice: data.ticketPrice ?? null,
         waitlistEnabled: data.waitlistEnabled ?? false,
@@ -380,6 +408,19 @@ export default function EventManagement() {
     setIsAddingSpeaker(!isAddingSpeaker);
     setIsAddingEvent(false)
     if (isAddingSpeaker) {
+      reset();
+      setError(null);
+    } else {
+      setTimeout(() => setFocus("name"), 0);
+    }
+  };
+
+  // Toggle add sponsor form
+  const toggleAddSponsorForm = () => {
+    setIsAddingSponsor(!isAddingSponsor);
+    setIsAddingSpeaker(false)
+    setIsAddingEvent(false)
+    if (isAddingSponsor) {
       reset();
       setError(null);
     } else {
@@ -482,6 +523,25 @@ export default function EventManagement() {
               </>
             )}
           </motion.button>
+
+          <motion.button
+            className="bg-[#6A0DAD] text-[#FFD700] px-4 py-2 rounded-lg flex items-center gap-2"
+            variants={buttonVariants}
+            whileHover="hover"
+            whileTap="tap"
+            onClick={toggleAddSponsorForm}
+            aria-label={isAddingSponsor ? "Hide add sponsor form" : "Add new sponsor"}
+          >
+            {isAddingSponsor ? (
+              <>
+                <FiChevronUp aria-hidden="true" /> Hide Form
+              </>
+            ) : (
+              <>
+                <FiPlus aria-hidden="true" /> Add New Sponsor
+              </>
+            )}
+          </motion.button>
         </div>
       </div>
 
@@ -489,6 +549,13 @@ export default function EventManagement() {
       <AnimatePresence>
         {isAddingSpeaker && (
           <AddSpeaker />
+        )}
+      </AnimatePresence>
+
+      {/* Add Sponsor Form */}
+      <AnimatePresence>
+        {isAddingSponsor && (
+          <AddSponsor />
         )}
       </AnimatePresence>
 
@@ -819,10 +886,10 @@ export default function EventManagement() {
                 )}
               </div>
 
-              {/* Existing Speakers */}
+              {/* Speakers */}
               <div className="md:col-span-2">
                 <label htmlFor="existingSpeakers" className="block text-sm font-medium">
-                  Select Existing Speakers
+                  Select Speakers
                 </label>
                 <Select
                   isMulti
@@ -840,6 +907,31 @@ export default function EventManagement() {
                 {errors.existingSpeakers && (
                   <p className="text-red-500 text-sm" role="alert">
                     {errors.existingSpeakers.message}
+                  </p>
+                )}
+              </div>
+
+              {/* Sponsors */}
+              <div className="md:col-span-2">
+                <label htmlFor="sponsors" className="block text-sm font-medium">
+                  Select Sponsors
+                </label>
+                <Select
+                  isMulti
+                  options={(sponsors || []).map((sponsor) => ({
+                    label: sponsor.sponsorName,
+                    value: sponsor.sponsorId,
+                  }))}
+                  onChange={(selected) =>
+                    setValue("sponsors", selected ? selected.map((s) => s.value) : [])
+                  }
+                  className="basic-multi-select"
+                  classNamePrefix="select"
+                  placeholder="Select sponsors..."
+                />
+                {errors.sponsors && (
+                  <p className="text-red-500 text-sm" role="alert">
+                    {errors.sponsors.message}
                   </p>
                 )}
               </div>

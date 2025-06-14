@@ -46,7 +46,8 @@ export async function POST(request: Request) {
             tags,
             accessibilityInfo,
             contactEmail,
-            contactPhone
+            contactPhone,
+            sponsors,
         } = body;
 
         const validatedSpeakers: string[] = [];
@@ -63,6 +64,26 @@ export async function POST(request: Request) {
                 validatedSpeakers.push(speakerId);
             }
         }
+
+        const validatedSponsors: string[] = [];
+        if (sponsors && Array.isArray(sponsors) && sponsors.length > 0) {
+            console.log("Received sponsors:", sponsors);
+            for (const sponsorId of sponsors) {
+                console.log("SponsorId", sponsorId)
+                const sponsorRef = doc(db, "sponsor", sponsorId);
+                const sponsorSnap = await getDoc(sponsorRef);
+                console.log("Snap", sponsorSnap)
+                if (!sponsorSnap.exists()) {
+                    return NextResponse.json(
+                        { error: `Invalid sponsor ID: ${sponsorId} does not exist in the sponsors collection` },
+                        { status: 400 }
+                    );
+                }
+                validatedSponsors.push(sponsorId);
+            }
+        }
+
+        console.log("Validated Sponsors", validatedSponsors)
 
         const eventId = `${eventName.replace(/\s+/g, '-').toLowerCase()}-${Date.now()}`;
 
@@ -97,7 +118,8 @@ export async function POST(request: Request) {
             bodyFont: bodyFont || null,
             eventDesc: eventDesc || null,
             agenda: agenda || null,
-            speakers: validatedSpeakers, // Use validated speaker IDs
+            speakers: validatedSpeakers,
+            sponsors: validatedSponsors,
             ticketEnabled: ticketEnabled || false,
             ticketPrice: ticketEnabled ? ticketPrice : null,
             waitlistEnabled: waitlistEnabled || false,

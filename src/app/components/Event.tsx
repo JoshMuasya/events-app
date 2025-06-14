@@ -15,6 +15,7 @@ import LoadingState from "./LoadingState";
 import ErrorState from "./ErrorState";
 import VirtualEventFeatures from "./VirtualEventFeature";
 import { StaffEventActions } from "./StaffEventAction";
+import EventSpeakers from "./EventSpeakers";
 
 export default function EventPage() {
     const { user, role, loading: authLoading } = useAuth();
@@ -161,7 +162,7 @@ export default function EventPage() {
 
     const isEventOver = new Date(event.date) < new Date();
 
-    console.log("Event", event.sponsors)
+    console.log("Event", event.speakers)
 
     return (
         <div
@@ -169,6 +170,7 @@ export default function EventPage() {
             style={{ color: event.textColor, fontFamily: event.bodyFont, backgroundColor: event.backgroundColor }}
         >
             <EventHeader event={event} liveData={liveData} />
+            <EventSpeakers speakers={event.speakers} />
             <EventSponsors sponsors={event.sponsors} secondaryColor={event.secondaryColor} />
             <EventDescription description={event.eventDesc} />
             <EventMap isVirtual={event.isVirtual} direction={event.direction} />

@@ -80,7 +80,7 @@ export interface EventDetail {
     waitlistEnabled: boolean;
     ticketPrice: number;
     ticketEnabled: boolean;
-    speakers: Speakers;
+    speakers: string[];
     agenda: string;
     eventDesc: string;
     bodyFont: "Roboto" | "Open Sans" | "Montserrat" | "Lora";
@@ -163,6 +163,10 @@ export type EventHeaderProps = {
 export type EventSponsorsProps = {
     sponsors: string[];
     secondaryColor: string;
+};
+
+export type EventSpeakersProps = {
+    speakers: string[];
 };
 
 export type EventSponsorsIdProps = {

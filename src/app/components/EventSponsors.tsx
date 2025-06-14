@@ -1,3 +1,5 @@
+"use client"
+
 import Image from "next/image";
 import { EventSponsorsProps, Sponsors } from "@/lib/types";
 import { useEffect, useState } from "react";

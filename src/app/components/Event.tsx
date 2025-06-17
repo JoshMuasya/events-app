@@ -16,6 +16,8 @@ import ErrorState from "./ErrorState";
 import VirtualEventFeatures from "./VirtualEventFeature";
 import { StaffEventActions } from "./StaffEventAction";
 import EventSpeakers from "./EventSpeakers";
+import EventSidebar from "./EventSideBar";
+import { addToCalendar } from "@/lib/calendar";
 
 export default function EventPage() {
     const { user, role, loading: authLoading } = useAuth();
@@ -33,6 +35,8 @@ export default function EventPage() {
 
     const isStaff = role === "Admin" || (role === "Staff" && "Organizer" && user?.uid && event?.createdBy && event?.assignedStaff && (user.uid === event.createdBy || event.assignedStaff.includes(user.uid)));
 
+    console.log("Events", event)
+    
     // Authorization Check
     useEffect(() => {
         if (!authLoading && !isStaff) {
@@ -89,29 +93,14 @@ export default function EventPage() {
 
     const handleManageRsvps = () => router.push(`/event-management/${eventId}/rsvps`);
     const handleManageTickets = () => router.push(`/event-management/${eventId}/tickets`);
-    // const handleAddToCalendar = () => {
-    //     addToCalendar(event!);
-    //     toast.success("Added to calendar");
-    // };
+    const handleAddToCalendar = () => {
+        
+        toast.success("Added to calendar");
+    };
 
-    // const shareEvent = (platform: string) => {
-    //     const url = `${window.location.origin}/events/${eventId}`;
-    //     const text = `Check out ${event?.eventName} on ${format(new Date(event!.date), "PPp")}`;
-    //     let shareUrl = "";
-    //     switch (platform) {
-    //         case "twitter":
-    //             shareUrl = `https://x.com/share?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`;
-    //             break;
-    //         case "facebook":
-    //             shareUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`;
-    //             break;
-    //         case "instagram":
-    //             navigator.clipboard.writeText(url);
-    //             toast.success("Copied link to clipboard");
-    //             return;
-    //     }
-    //     window.open(shareUrl, "_blank");
-    // };
+    const shareEvent = (platform: string) => {
+        console.log("Shared Event")
+    };
 
     if (authLoading || loading) {
         return (
@@ -173,8 +162,8 @@ export default function EventPage() {
             <EventSpeakers speakers={event.speakers} />
             <EventSponsors sponsors={event.sponsors} secondaryColor={event.secondaryColor} />
             <EventDescription description={event.eventDesc} />
-            <EventMap isVirtual={event.isVirtual} direction={event.direction} />
-            <VirtualEventFeatures isVirtual={event.isVirtual} />
+            <EventMap isVirtual={event.isVirtual} coordinates={event.coordinates} />
+            <EventSidebar event={event} handleAddToCalendar={handleAddToCalendar} shareEvent={shareEvent} />
             <StaffEventActions
                 isStaff={isStaff}
                 event={event}
@@ -185,7 +174,6 @@ export default function EventPage() {
             />
 
             {/* <EventAnalytics isStaff={isStaff} eventId={eventId} /> */}
-            {/* <EventSidebar event={event} handleAddToCalendar={handleAddToCalendar} shareEvent={shareEvent} /> */}
         </div>
     );
 }

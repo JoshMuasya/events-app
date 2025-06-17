@@ -58,6 +58,7 @@ export interface EventDetail {
     date: string;
     status: "Draft" | "Ongoing" | "Cancelled" | "Published" | "Completed";
     location: string;
+    coordinates?: { lat: number; lng: number };
     isVirtual: boolean;
     ticketSales: number;
     totalRevenue: number;

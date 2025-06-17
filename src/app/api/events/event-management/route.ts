@@ -47,6 +47,7 @@ export async function POST(request: Request) {
             accessibilityInfo,
             contactEmail,
             contactPhone,
+            coordinates,
             sponsors,
         } = body;
 
@@ -130,6 +131,7 @@ export async function POST(request: Request) {
             contactEmail: contactEmail || null,
             contactPhone: contactPhone || null,
             createdAt: serverTimestamp(),
+            coordinates: coordinates || null,
         };
 
         await setDoc(doc(db, "events", eventId), eventData);

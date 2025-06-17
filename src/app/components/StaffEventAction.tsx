@@ -13,7 +13,7 @@ export function StaffEventActions({
     if (!isStaff) return null;
 
     return (
-        <div className="mb-6">
+        <div className="my-6">
             <div className="flex flex-wrap gap-4 mb-4">
                 <motion.button
                     whileHover={{ scale: 1.05 }}

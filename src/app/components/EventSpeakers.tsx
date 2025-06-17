@@ -40,7 +40,7 @@ export default function EventSpeakers({ speakers }: EventSpeakersProps) {
                 {speaker.map((s) => (
                     <div
                         key={s.id}
-                        className="p-4 bg-white/5 rounded-xl border border-white/10 text-center shadow-lg"
+                        className="p-4 mx-3 bg-white/5 rounded-xl border border-white/10 text-center shadow-lg"
                     >
                         {s.profileImage && (
                             <Image

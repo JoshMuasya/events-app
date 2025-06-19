@@ -20,7 +20,7 @@ export function StaffEventActions({
                     whileTap={{ scale: 0.95 }}
                     onClick={handleEdit}
                     className="px-4 py-2 rounded text-white flex items-center gap-2"
-                    style={{ backgroundColor: event.primaryColor }}
+                    style={{ backgroundColor: event.primaryColor, color: event.secondaryColor }}
                     aria-label="Edit Event"
                 >
                     <FiEdit /> Edit Event
@@ -38,7 +38,8 @@ export function StaffEventActions({
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     onClick={handleManageRsvps}
-                    className="px-4 py-2 rounded bg-gray-500 text-white flex items-center gap-2"
+                    className="px-4 py-2 rounded text-white flex items-center gap-2"
+                    style={{ backgroundColor: event.primaryColor, color: event.secondaryColor }}
                     aria-label="Manage RSVPs"
                 >
                     <FiUsers /> Manage RSVPs
@@ -49,6 +50,7 @@ export function StaffEventActions({
                         whileTap={{ scale: 0.95 }}
                         onClick={handleManageTickets}
                         className="px-4 py-2 rounded bg-gray-500 text-white flex items-center gap-2"
+                        style={{ backgroundColor: event.primaryColor, color: event.secondaryColor }}
                         aria-label="Manage Tickets"
                     >
                         <FiUsers /> Manage Tickets
@@ -59,6 +61,7 @@ export function StaffEventActions({
                     whileTap={{ scale: 0.95 }}
                     onClick={() => window.location.href = `/events/${event.id}/analytics`}
                     className="px-4 py-2 rounded bg-gray-500 text-white flex items-center gap-2"
+                    style={{ backgroundColor: event.primaryColor, color: event.secondaryColor }}
                     aria-label="View Analytics"
                 >
                     <FiUsers /> View Analytics

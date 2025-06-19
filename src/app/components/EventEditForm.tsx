@@ -1,6 +1,6 @@
 "use client";
 
-import { EventEditData, SpeakerOption, Speakers, StaffOption, User } from '@/lib/types';
+import { EventEditData, SpeakerOption, Speakers, SponsorOption, Sponsors, StaffOption, User } from '@/lib/types';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useParams, useRouter } from 'next/navigation';
@@ -18,6 +18,7 @@ import { Select as ShadcnSelect, SelectContent, SelectItem, SelectTrigger, Selec
 import { Label } from "@/components/ui/label";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Settings } from 'lucide-react';
+import { auth } from '@/lib/firebase';
 
 const eventEditSchema = z
   .object({
@@ -25,7 +26,6 @@ const eventEditSchema = z
     date: z.string().min(1, "Date and time are required"),
     location: z.string().min(1, "Location is required").max(200, "Location is too long"),
     isVirtual: z.boolean(),
-    direction: z.string().url("Invalid Google Maps URL"),
     status: z.enum(["Draft", "Published", "Unpublished", "Ongoing", "Cancelled", "Completed"], {
       errorMap: () => ({ message: "Status is required" }),
     }),
@@ -48,6 +48,13 @@ const eventEditSchema = z
         speakerName: z.string().min(1, "Speaker name is required"),
         description: z.string().max(1000, "Description is too long"),
         profileImage: z.string().url("Invalid image URL").nullable(),
+      })
+    ),
+    sponsors: z.array(
+      z.object({
+        sponsorId: z.string(),
+        sponsorName: z.string().min(1, "Sponsor name is required"),
+        sponsorLogo: z.string().url("Invalid image URL").nullable(),
       })
     ),
     ticketEnabled: z.boolean(),
@@ -88,13 +95,6 @@ const eventEditSchema = z
       message: "Max attendees is required for invites-only events",
       path: ["maxAttendees"],
     }
-  )
-  .refine(
-    (data) => data.isVirtual || (data.direction && data.direction.length > 0),
-    {
-      message: "Google Maps link is required for non-virtual events",
-      path: ["direction"],
-    }
   );
 
 type FormData = z.infer<typeof eventEditSchema>;
@@ -108,6 +108,7 @@ const EventEditForm = () => {
   const { user: authUser, loading: authLoading, role: Role } = useAuth();
   const [eventUsers, setEventUsers] = useState<User[]>([]);
   const [eventSpeakers, setEventSpeakers] = useState<Speakers[]>([]);
+  const [eventSponsors, setEventSponsors] = useState<Sponsors[]>([]);
 
   const fetchEvents = async () => {
     try {
@@ -160,10 +161,28 @@ const EventEditForm = () => {
     }
   };
 
+  const fetchSponsors = async () => {
+    try {
+      setIsLoading(true);
+      const response = await fetch("/api/sponsors");
+      if (!response.ok) {
+        throw new Error("Failed to fetch Sponsors");
+      }
+      const data = await response.json();
+      setEventSponsors(data);
+    } catch (error) {
+      console.error("Error fetching Sponsors:", error);
+      toast.error("Failed to load Sponsors");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchEvents();
     fetchUsers();
     fetchSpeakers();
+    fetchSponsors();
   }, [eventId]);
 
   const form = useForm<FormData>({
@@ -173,7 +192,6 @@ const EventEditForm = () => {
       date: "",
       location: "",
       isVirtual: false,
-      direction: "",
       status: "Draft",
       image: null,
       primaryColor: "#000000",
@@ -184,7 +202,7 @@ const EventEditForm = () => {
       bodyFont: "Roboto",
       eventDesc: "",
       agenda: "",
-      speakers: [], // Initialize as empty array, will be updated in useEffect
+      speakers: [],
       ticketEnabled: false,
       ticketPrice: null,
       waitlistEnabled: false,
@@ -201,57 +219,40 @@ const EventEditForm = () => {
   });
 
   useEffect(() => {
-    if (event && eventSpeakers) {
-      const mappedSpeakers = event.speakers
-        ?.map(id => eventSpeakers.find(s => s.id === id))
-        .filter((s): s is Speakers => s !== undefined && s !== null && typeof s.id === "string") || [];
-      form.reset({
-        eventName: event.eventName || "",
-        date: event.date || "",
-        location: event.location || "",
-        isVirtual: event.isVirtual || false,
-        direction: event.direction || "",
-        status: event.status || "Draft",
-        image: event.image || null,
-        primaryColor: event.primaryColor || "#000000",
-        secondaryColor: event.secondaryColor || "#000000",
-        backgroundColor: event.backgroundColor || "#ffffff",
-        textColor: event.textColor || "#000000",
-        headingFont: event.headingFont || "Roboto",
-        bodyFont: event.bodyFont || "Roboto",
-        eventDesc: event.eventDesc || "",
-        agenda: event.agenda || "",
-        speakers: mappedSpeakers, // Map IDs to full speaker objects
-        ticketEnabled: event.ticketEnabled || false,
-        ticketPrice: event.ticketPrice || null,
-        waitlistEnabled: event.waitlistEnabled || false,
-        waitlistLimit: event.waitlistLimit || null,
-        category: event.category || undefined,
-        tags: event.tags || "",
-        accessibilityInfo: event.accessibilityInfo || "",
-        contactEmail: event.contactEmail || "",
-        contactPhone: event.contactPhone || "",
-        assignedStaff: event.assignedStaff || [],
-        isInvitesOnly: event.isInvitesOnly || false,
-        maxAttendees: event.maxAttendees || null, // Fix typo from Firebase
-        createdAt: event.createdAt || undefined,
-        createdBy: event.createdBy || "",
-        eventId: event.eventId || eventId,
-      });
-    }
-  }, [event, eventSpeakers, form, eventId]);
+    if (event && eventSpeakers.length > 0) {
+      // Debug: Log data to identify mismatches
+      console.log("Event Speakers IDs:", event.speakers);
+      console.log("Available Speakers:", eventSpeakers);
 
-  useEffect(() => {
-    if (event && eventSpeakers) {
       const mappedSpeakers = event.speakers
-        ?.map(id => eventSpeakers.find(s => s.id === id))
-        .filter((s): s is Speakers => s !== undefined && s !== null && typeof s.id === "string") || [];
+        ?.map(id => {
+          const speaker = eventSpeakers.find(s => s.id === String(id)); // Normalize ID to string
+          if (!speaker) {
+            console.warn(`Speaker with ID ${id} not found in eventSpeakers`);
+          }
+          return speaker;
+        })
+        .filter((s): s is Speakers => s !== undefined && s !== null) || [];
+
+      console.log("Mapped Speakers:", mappedSpeakers);
+
+      const mappedSponsors = event.sponsors
+        ?.map(id => {
+          const sponsors = eventSponsors.find(spo => spo.sponsorId === String(id)); // Normalize ID to string
+          if (!sponsors) {
+            console.warn(`Sponsorswith ID ${id} not found in eventSponsors`);
+          }
+          return sponsors
+        })
+        .filter((spo): spo is Sponsors => spo !== undefined && spo !== null) || [];
+
+      console.log("Mapped Sponsors:", mappedSponsors);
+
       form.reset({
         eventName: event.eventName || "",
         date: event.date || "",
         location: event.location || "",
         isVirtual: event.isVirtual || false,
-        direction: event.direction || "",
         status: event.status || "Draft",
         image: event.image || null,
         primaryColor: event.primaryColor || "#000000",
@@ -262,7 +263,8 @@ const EventEditForm = () => {
         bodyFont: event.bodyFont || "Roboto",
         eventDesc: event.eventDesc || "",
         agenda: event.agenda || "",
-        speakers: mappedSpeakers, // Explicitly set to array of objects
+        speakers: mappedSpeakers,
+        sponsors: mappedSponsors,
         ticketEnabled: event.ticketEnabled || false,
         ticketPrice: event.ticketPrice || null,
         waitlistEnabled: event.waitlistEnabled || false,
@@ -274,13 +276,13 @@ const EventEditForm = () => {
         contactPhone: event.contactPhone || "",
         assignedStaff: event.assignedStaff || [],
         isInvitesOnly: event.isInvitesOnly || false,
-        maxAttendees: event.maxAttendees ?? null, // Fix typo from Firebase
+        maxAttendees: event.maxAttendees ?? null,
         createdAt: event.createdAt || undefined,
         createdBy: event.createdBy || "",
         eventId: event.eventId || eventId,
       });
     }
-  }, [event, eventSpeakers, form, eventId]);
+  }, [event, eventSpeakers, eventSponsors, form, eventId]);
 
   const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -293,8 +295,47 @@ const EventEditForm = () => {
     }
   };
 
+  const getFirebaseToken = async () => {
+    const user = await auth.currentUser
+
+    if (!user) {
+      return null
+    }
+
+    try {
+      const idToken = await user.getIdToken(true);
+      return idToken
+    } catch (error) {
+      console.error("Error getting ID token:", error);
+      return null;
+    }
+  }
+
   const onSubmit = async (data: FormData) => {
-    console.log("Submitted Data", data);
+    try {
+      const idToken = await getFirebaseToken();
+      if (!idToken) throw new Error("User not authenticated")
+
+      const response = await fetch(`/api/events/event-management/${eventId}`, {
+        method: 'PUT',
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`
+        },
+        body: JSON.stringify(data)
+      });
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to update event")
+      }
+
+      console.log("Event updated successfully:", result);
+    } catch (error) {
+      console.error("Error updating event:", error);
+      throw error;
+    }
   };
 
   const formVariants = {
@@ -328,7 +369,7 @@ const EventEditForm = () => {
 
   if (authLoading || isLoading) {
     return (
-      <div className="max-w-4xl mx-auto p-6">
+      <div className="max-w-4xl mx-auto p-6 mt-20">
         <div className="bg-white/5 backdrop-blur-sm p-6 rounded-xl shadow-lg animate-pulse border border-white/10">
 
           {/* Icon and Page Title Placeholder */}
@@ -392,7 +433,7 @@ const EventEditForm = () => {
   }
 
   return (
-    <div className="container mx-auto p-6">
+    <div className="container mx-auto p-6 mt-20">
       <AnimatePresence>
         <motion.div
           className="bg-[rgba(255,215,0,0.2)] backdrop-blur-md rounded-lg p-6 mb-6 shadow-[0_4px_12px_rgba(106,13,173,0.3)] text-[#6A0DAD]"
@@ -403,6 +444,19 @@ const EventEditForm = () => {
           role="form"
           aria-labelledby="add-event-form-title"
         >
+          {/* Header */}
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, ease: "easeOut" }}
+            className="flex items-center space-x-3 mb-8"
+          >
+            <Settings className="h-6 w-6 text-[#6A0DAD]" />
+            <h1 className="text-2xl font-bold text-[#6A0DAD]">
+              Edit {event?.eventName}
+            </h1>
+          </motion.div>
+
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Event Name */}
@@ -482,29 +536,6 @@ const EventEditForm = () => {
                   </FormItem>
                 )}
               />
-
-              {/* Map Coordinates (for non-virtual events) */}
-              {!form.watch("isVirtual") && (
-                <FormField
-                  control={form.control}
-                  name="direction"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Google Maps Link</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="url"
-                          placeholder="Enter Google Maps link (e.g., https://www.google.com/maps/...)"
-                          className="bg-white text-[#6A0DAD]"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-
-                />
-              )}
 
               {/* Status */}
               <FormField
@@ -791,6 +822,73 @@ const EventEditForm = () => {
                 )}
               />
 
+              {/* Sponsors */}
+              <FormField
+                control={form.control}
+                name="sponsors"
+                render={({ field }) => (
+                  <FormItem className="md:col-span-2">
+                    <FormLabel>Sponsors</FormLabel>
+                    <div className="mb-2">
+                      {field?.value?.length > 0 ? (
+                        <div className="flex flex-wrap gap-2">
+                          {field?.value.map((sponsor, index) => (
+                            <div
+                              key={sponsor.sponsorId}
+                              className="bg-white text-[#6A0DAD] px-3 py-1 rounded-full border border-[#6A0DAD] flex items-center"
+                            >
+                              <span>{sponsor.sponsorName}</span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const updatedSponsors = field?.value.filter((_, i) => i !== index);
+                                  form.setValue("sponsors", updatedSponsors, { shouldValidate: true });
+                                }}
+                                className="ml-2 text-red-500 hover:text-red-700"
+                                aria-label={`Remove ${sponsor.sponsorName} from sponsors`}
+                              >
+                                ×
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-gray-500">No sponsors currently assigned</p>
+                      )}
+                    </div>
+                    <FormControl>
+                      <Select<SponsorOption, true>
+                        isMulti
+                        options={eventSponsors.map(sponsor => ({
+                          value: sponsor.sponsorId,
+                          label: sponsor.sponsorName,
+                        }))}
+                        value={[]}
+                        onChange={(selected) => {
+                          const selectedSponsors = selected
+                            ?.filter((s): s is SponsorOption => s !== null)
+                            .map(s => {
+                              const sponsor = eventSponsors.find(sp => sp.sponsorId === s.value);
+                              return {
+                                sponsorId: s.value,
+                                sponsorName: sponsor?.sponsorName || "",
+                                sponsorLogo: sponsor?.sponsorLogo || null,
+                              };
+                            }) || [];
+                          const updatedSponsors = [...(field.value || []), ...selectedSponsors];
+                          form.setValue("sponsors", updatedSponsors, { shouldValidate: true });
+                        }}
+                        className="basic-multi-select"
+                        classNamePrefix="select"
+                        placeholder="Add more sponsors..."
+                        noOptionsMessage={() => "No additional sponsors available"}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
               {/* Ticket Settings */}
               <div className="md:col-span-2">
                 <h3 className="text-lg font-medium mb-2">Ticket Settings</h3>
@@ -1021,7 +1119,6 @@ const EventEditForm = () => {
                                         eventName: prev.eventName || "",
                                         date: prev.date || "",
                                         location: prev.location || "",
-                                        direction: prev.direction || "",
                                         status: prev.status || "Draft",
                                         primaryColor: prev.primaryColor || "#000000",
                                         secondaryColor: prev.secondaryColor || "#000000",
@@ -1080,7 +1177,6 @@ const EventEditForm = () => {
                               eventName: prev.eventName || "",
                               date: prev.date || "",
                               location: prev.location || "",
-                              direction: prev.direction || "",
                               status: prev.status || "Draft",
                               primaryColor: prev.primaryColor || "#000000",
                               secondaryColor: prev.secondaryColor || "#000000",

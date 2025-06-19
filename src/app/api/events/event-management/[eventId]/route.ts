@@ -73,16 +73,16 @@ export async function PUT(
 ) {
   const authHeader = request.headers.get("Authorization");
 
-  console.log("Token", authHeader)
+  console.log("Token", authHeader);
 
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
     return NextResponse.json(
       { error: "Unauthorized: No token provided" },
       { status: 401 }
-    )
+    );
   }
 
-  const idToken = authHeader.split("Bearer ")[1]
+  const idToken = authHeader.split("Bearer ")[1];
   let user;
 
   try {
@@ -96,21 +96,33 @@ export async function PUT(
   }
 
   const body = await request.json();
-
   const eventRef = adminFirestore.collection("events").doc((await params).eventId);
-  const eventSnap = await eventRef.get()
+  const eventSnap = await eventRef.get();
+
   if (!eventSnap.exists) {
     return NextResponse.json({ error: "Event not found" }, { status: 404 });
   }
 
   const existingEvent = eventSnap.data() as EventDetail;
 
-  // if (existingEvent.createdBy !== user?.id && !user?.role) {
+  // Optional: Reinstate authorization check if needed
+  // if (existingEvent.createdBy !== user?.uid && !user?.role) {
   //   return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   // }
 
-  const updatedEventSnap = await eventRef.get();
-  const updatedEvent = { id: updatedEventSnap.id, ...updatedEventSnap.data() }
+  // Update the event with the data from the request body
+  try {
+    await eventRef.update({
+      ...body
+    });
 
-  return NextResponse.json(updatedEvent, { status: 200 });
+    // Fetch the updated event
+    const updatedEventSnap = await eventRef.get();
+    const updatedEvent = { id: updatedEventSnap.id, ...updatedEventSnap.data() };
+
+    return NextResponse.json(updatedEvent, { status: 200 });
+  } catch (error) {
+    console.error("Error updating event:", error);
+    return NextResponse.json({ error: "Failed to update event" }, { status: 500 });
+  }
 }

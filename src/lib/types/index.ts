@@ -127,6 +127,7 @@ export type EventEditData = {
   createdAt: { seconds: number; nanoseconds: number } | null;
   createdBy: string;
   eventId: string;
+  sponsors: string[];
 };
 
 export interface Sponsors {
@@ -271,6 +272,11 @@ export type StaffOption = {
 };
 
 export type SpeakerOption = {
+  value: string;
+  label: string;
+};
+
+export type SponsorOption = {
   value: string;
   label: string;
 };

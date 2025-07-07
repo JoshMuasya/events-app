@@ -264,6 +264,13 @@ export interface StaffEventActionsProps {
     handleDelete: () => Promise<void>;
     handleManageRsvps: () => void;
     handleManageTickets: () => void;
+    handleSendEventLink: () => void;
+}
+
+export interface GuestEventActionsProps {
+    event: EventDetail;
+    handleGuestRsvp: () => void;
+    handleBuyTickets: () => void;
 }
 
 export type StaffOption = {

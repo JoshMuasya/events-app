@@ -1,7 +1,7 @@
 import { adminAuth, adminFirestore } from "@/lib/admin";
 import { auth, db } from "@/lib/firebase";
 import { EventDetail, Speakers, User } from "@/lib/types";
-import { collection, doc, getDoc, getDocs, query, setDoc, where } from "@firebase/firestore";
+import { collection, deleteDoc, doc, getDoc, getDocs, query, setDoc, where } from "@firebase/firestore";
 import { getAuth } from "firebase/auth";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -124,5 +124,36 @@ export async function PUT(
   } catch (error) {
     console.error("Error updating event:", error);
     return NextResponse.json({ error: "Failed to update event" }, { status: 500 });
+  }
+}
+
+export async function DELETE(
+  req: Request,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const { id } = params;
+
+    // Fetch event to verify existence
+    const eventDoc = await getDoc(doc(db, "events", id));
+    if (!eventDoc.exists()) {
+      return NextResponse.json(
+        { error: "Event not found" },
+        { status: 404 }
+      );
+    }
+
+    await deleteDoc(doc(db, "events", id));
+    return NextResponse.json(
+      { message: "Event deleted successfully" },
+      { status: 200 }
+    );
+  } catch (error) {
+    console.error("Error deleting event:", error, { eventId: params.id });
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    return NextResponse.json(
+      { error: `Failed to delete event: ${errorMessage}` },
+      { status: 500 }
+    );
   }
 }

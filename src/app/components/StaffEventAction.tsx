@@ -1,6 +1,7 @@
 import { StaffEventActionsProps } from "@/lib/types";
 import { motion } from "framer-motion";
 import { FiEdit, FiTrash2, FiUsers } from "react-icons/fi";
+import { MdOutlineEventNote } from "react-icons/md";
 
 export function StaffEventActions({
     isStaff,
@@ -9,6 +10,7 @@ export function StaffEventActions({
     handleDelete,
     handleManageRsvps,
     handleManageTickets,
+    handleSendEventLink,
 }: StaffEventActionsProps) {
     if (!isStaff) return null;
 
@@ -33,6 +35,16 @@ export function StaffEventActions({
                     aria-label="Delete Event"
                 >
                     <FiTrash2 /> Delete Event
+                </motion.button>
+                <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={handleSendEventLink}
+                    className="px-4 py-2 rounded bg-gray-500 text-white flex items-center gap-2"
+                    style={{ backgroundColor: event.primaryColor, color: event.secondaryColor }}
+                    aria-label="Send Event Link"
+                >
+                    <MdOutlineEventNote /> Send Event Link
                 </motion.button>
                 <motion.button
                     whileHover={{ scale: 1.05 }}

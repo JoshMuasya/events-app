@@ -259,9 +259,9 @@ export default function EventManagement() {
       return (
         (searchQuery
           ? Object.values(event)
-              .join(" ")
-              .toLowerCase()
-              .includes(searchQuery.toLowerCase())
+            .join(" ")
+            .toLowerCase()
+            .includes(searchQuery.toLowerCase())
           : true) &&
         (!start || eventDate >= start) &&
         (!end || eventDate <= end) &&
@@ -505,7 +505,7 @@ export default function EventManagement() {
   }
 
   return (
-    <div className="container mx-auto p-6">
+    <div className="container mx-auto p-6 mt-20">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-[#6A0DAD] flex items-center gap-2">
           <FiSearch aria-hidden="true" /> Manage Events
@@ -1285,22 +1285,22 @@ export default function EventManagement() {
       </div>
 
       {/* Event Cards */}
-      {filteredEvents.length === 0 ? (
+      {currentEvents.length === 0 ? (
         <div className="text-center py-10 text-[#6A0DAD]" role="alert">
           <p>No events found.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredEvents.map((event) => {
+          {currentEvents.map((event) => {
             const eventType = getEventType(event);
             const typeClass =
               eventType === "upcoming"
                 ? "bg-[rgba(255,215,0,0.2)]"
                 : eventType === "ongoing"
-                ? "bg-[rgba(255,215,0,0.3)]"
-                : eventType === "archived"
-                ? "bg-[rgba(255,215,0,0.1)]"
-                : "bg-[rgba(255,215,0,0.4)]";
+                  ? "bg-[rgba(255,215,0,0.3)]"
+                  : eventType === "archived"
+                    ? "bg-[rgba(255,215,0,0.1)]"
+                    : "bg-[rgba(255,215,0,0.4)]";
             const assignedStaffNames = event.assignedStaff
               .map((staffId) => {
                 const user = (staffUsers || []).find((u) => u.id === staffId);
@@ -1443,11 +1443,10 @@ export default function EventManagement() {
             <button
               key={page}
               onClick={() => setCurrentPage(page)}
-              className={`btn ${
-                currentPage === page
+              className={`btn ${currentPage === page
                   ? "bg-[#FFD700] text-[#6A0DAD]"
                   : "bg-[#6A0DAD] text-white hover:bg-[#FFD700] hover:text-[#6A0DAD]"
-              }`}
+                }`}
               aria-label={`Go to page ${page}`}
             >
               {page}

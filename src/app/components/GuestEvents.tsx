@@ -3,9 +3,6 @@
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import toast from "react-hot-toast";
-import { useAuth } from "@/lib/AuthContext";
-import { deleteDoc, doc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
 import { EventDetail } from "@/lib/types";
 import EventHeader from "./EventHeader";
 import EventSponsors from "./EventSponsors";
@@ -14,10 +11,9 @@ import EventMap from "./EventMap";
 import EventSidebar from "./EventSideBar";
 import EventSpeakers from "./EventSpeakers";
 import ErrorState from "./ErrorState";
-import { StaffEventActions } from "./StaffEventAction";
+import GuestActions from "./GuestActions";
 
 export default function EventPage() {
-    const { user, role, loading: authLoading } = useAuth();
     const router = useRouter();
     const params = useParams();
     const eventId = params.eventId as string;
@@ -29,21 +25,6 @@ export default function EventPage() {
     const [ticketInfo, setTicketInfo] = useState<{ code: string; qrCode: string } | null>(null);
     const [waitlistJoined, setWaitlistJoined] = useState(false);
     const [liveData, setLiveData] = useState({ attendees: 0, ticketsRemaining: 0 });
-
-    const isStaff = role === "Admin" || (role === "Staff" && "Organizer" && user?.uid && event?.createdBy && event?.assignedStaff && (user.uid === event.createdBy || event.assignedStaff.includes(user.uid)));
-
-    // Authorization Check
-    useEffect(() => {
-        if (!authLoading && !isStaff) {
-            router.push(`/events/${eventId}`);
-            toast.error("Access restricted to organizers only");
-        } else if (!authLoading && user && role !== "Admin" &&
-            ((role === "Organizer" && user.uid !== event?.createdBy && (!event?.assignedStaff || !event.assignedStaff.includes(user.uid))) ||
-                (role === "Staff" && (!event?.assignedStaff || !event.assignedStaff.includes(user.uid))))) {
-            router.push("/event-management");
-            toast.error("You are not authorized to manage this event");
-        }
-    }, [authLoading, user, role, eventId, router]);
 
     const fetchEvents = async () => {
         try {
@@ -66,31 +47,8 @@ export default function EventPage() {
         fetchEvents();
     }, [eventId]);
 
-    const handleEdit = () => router.push(`/event-management/${eventId}/edit`);
-    const handleDelete = async () => {
-        if (confirm("Are you sure you want to delete this event?")) {
-            try {
-                const response = await fetch(`/api/events/event-management/${eventId}`, {
-                    method: 'DELETE'
-                });
-                if (!response.ok) {
-                    const errorData = await response.json().catch(() => ({}));
-                    const errorMessage = errorData.error || `Failed to delete event (Status: ${response.status})`;
-                    throw new Error(errorMessage);
-                }
-                toast.success("Event deleted successfully");
-                router.push("/event-management");
-            } catch (err: any) {
-                const errorMessage = err instanceof Error ? err.message : "Unknown error";
-                console.error("Error deleting event:", err, { status: err.status || 'unknown' });
-                toast.error(`Failed to delete event: ${errorMessage}`);
-            }
-        }
-    };
-
     const handleManageRsvps = () => router.push(`/event-management/${eventId}/rsvps`);
     const handleManageTickets = () => router.push(`/event-management/${eventId}/tickets`);
-    const handleSendEventLink = () => router.push(`/event-management/${eventId}/guest-event`);
 
     const handleAddToCalendar = () => {
         if (!event) return;
@@ -163,7 +121,7 @@ export default function EventPage() {
         }
     };
 
-    if (authLoading || loading) {
+    if ( loading) {
         return (
             <div className="max-w-4xl mx-auto p-6 mt-20">
                 <div className="bg-white/5 backdrop-blur-sm p-6 rounded-xl shadow-lg animate-pulse border border-white/10">
@@ -201,9 +159,11 @@ export default function EventPage() {
         return <ErrorState error={error} />;
     }
 
-    const isEventOver = new Date(event.date) < new Date();
+    const handleRsvp = () => router.push(`/event-management/${eventId}/guest-event/guest-rsvp`);
 
-    console.log("Sponsors", event.sponsors)
+    const handleTickets = () => {
+        
+    }
 
     return (
         <div
@@ -220,15 +180,10 @@ export default function EventPage() {
                 handleAddToCalendar={handleAddToCalendar}
                 shareEvent={shareEvent}
             />
-            <StaffEventActions
-                isStaff={isStaff}
-                event={event}
-                handleEdit={handleEdit}
-                handleDelete={handleDelete}
-                handleManageRsvps={handleManageRsvps}
-                handleManageTickets={handleManageTickets}
-                handleSendEventLink={handleSendEventLink}
-            />
+            <GuestActions 
+            event={event} 
+            handleGuestRsvp={handleRsvp} 
+            handleBuyTickets={handleTickets} />
         </div>
     );
 }

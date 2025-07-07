@@ -1,5 +1,5 @@
+import GuestEvents from '@/app/components/GuestEvents'
 import React from 'react'
-import GuestEvents from '../components/GuestEvents'
 
 const page = () => {
   return (

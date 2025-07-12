@@ -47,7 +47,7 @@ export async function GET(
       ...eventData,
       id: eventDoc.id,
       attendies: eventData.attendies || 0,
-      sponsors: eventData.sponsors || [{ name: "Sponsor 1", logo: "/sponsor1.png" }],
+      sponsors: eventData.sponsors,
     };
 
     return NextResponse.json({ event }, { status: 200 });

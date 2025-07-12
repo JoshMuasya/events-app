@@ -287,3 +287,38 @@ export type SponsorOption = {
   value: string;
   label: string;
 };
+
+export interface TicketListProps {
+  eventId: string;
+  event: { title: string; description: string; date: string; location: string };
+}
+
+export interface Ticket {
+  id: string;
+  eventId: string;
+  type: string;
+  price: number;
+  availability: number;
+  perks: string[];
+  status: string;
+}
+
+export interface TicketForm {
+  id?: string;
+  type: string;
+  price: number;
+  availability: number;
+  perks: string[];
+  status?: string;
+}
+
+export interface TicketManagerProps {
+  eventId: string;
+}
+
+export interface SelectedTicket {
+  id: string;
+  type: string;
+  price: number;
+  quantity: number;
+}

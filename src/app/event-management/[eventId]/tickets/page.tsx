@@ -9,7 +9,7 @@ const page = () => {
 
     return (
         <div>
-            Tickets for {eventId}
+            
         </div>
     )
 }

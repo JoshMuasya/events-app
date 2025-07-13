@@ -6,23 +6,21 @@ import { useForm } from 'react-hook-form';
 import toast from 'react-hot-toast';
 import { z } from 'zod';
 import { motion } from "framer-motion";
+import { useParams } from 'next/navigation';
 
 const ticketSchema = z.object({
-  id: z.string().min(1, "Ticket ID is required").uuid("Invalid ticket ID format"),
-  eventId: z.string().min(1, "Event ID is required").uuid("Invalid event ID format"),
-  ticketType: z.string().min(1, "Ticket type is required").max(50, "Ticket type must be 50 characters or less"),
-  ticketPrice: z.number().positive("Price must be positive").min(0, "Price cannot be negative"),
-  ticketAvailability: z.number().int("Availability must be an integer").min(0, "Availability cannot be negative"),
-  ticketPerks: z.array(z.string().min(1, "Perk cannot be empty")).min(1, "At least one perk is required"),
-  ticketStatus: z.enum(["available", "valid", "used"], {
-    errorMap: () => ({ message: "Status must be 'available', 'valid', or 'used'" }),
-  }),
+    ticketType: z.string().min(1, "Ticket type is required").max(50, "Ticket type must be 50 characters or less"),
+    ticketPrice: z.number().positive("Price must be positive").min(0, "Price cannot be negative"),
+    ticketAvailability: z.number().int("Availability must be an integer").min(0, "Availability cannot be negative"),
+    ticketPerks: z.array(z.string().min(1, "Perk cannot be empty")).min(1, "At least one perk is required"),
+    ticketStatus: z.string().min(1, "Ticket status required")
 });
 
 type FormData = z.infer<typeof ticketSchema>;
 
 const AddTicket = () => {
-    const [error, setError] = useState<string | null>(null);
+    const params = useParams()
+    const eventId = params.eventId as string
 
     const formVariants = {
         hidden: { opacity: 0, height: 0 },
@@ -55,11 +53,36 @@ const AddTicket = () => {
     })
 
     const onSubmit = async (data: FormData) => {
-        
+        try {
+            const response = await fetch("/api/ticket", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    eventId: eventId,
+                    type: data.ticketType,
+                    price: data.ticketPrice,
+                    availability: data.ticketAvailability,
+                    perks: data.ticketPerks,
+                    status: data.ticketStatus
+                })
+            })
+
+            if (!response.ok) {
+                const result = await response.json();
+                throw new Error(result.error || "Failed to create new Ticket")
+            }
+
+            toast.success("Ticket Added Successfully")
+            reset();
+        } catch (err) {
+            toast.error("Failed to Add Ticket")
+        }
     };
 
     return (
-        <div>
+        <div className='pt-20'>
             {/* New Ticket */}
             <motion.div
                 className="bg-[rgba(255,215,0,0.2)] backdrop-blur-md rounded-lg p-6 mb-6 shadow-[0_4px_12px_rgba(106,13,173,0.3)] text-[#6A0DAD]"
@@ -96,7 +119,8 @@ const AddTicket = () => {
                             </label>
                             <input
                                 id="ticketPrice"
-                                {...register('ticketPrice', { required: 'Price of Ticket is required' })}
+                                type='number'
+                                {...register('ticketPrice', { valueAsNumber: true })}
                                 className="input input-bordered w-full bg-white text-[#6A0DAD]"
                                 placeholder="Enter Ticket Price"
                                 aria-invalid={errors.ticketPrice ? 'true' : 'false'}
@@ -110,11 +134,12 @@ const AddTicket = () => {
 
                         <div>
                             <label htmlFor="name" className="block text-sm font-medium">
-                                Available Tickets 
+                                Available Tickets
                             </label>
                             <input
                                 id="ticketAvailability"
-                                {...register('ticketAvailability', { required: 'Number of Tickets is required' })}
+                                type='number'
+                                {...register('ticketAvailability', { valueAsNumber: true })}
                                 className="input input-bordered w-full bg-white text-[#6A0DAD]"
                                 placeholder="Enter Available Ticket"
                                 aria-invalid={errors.ticketAvailability ? 'true' : 'false'}
@@ -125,14 +150,17 @@ const AddTicket = () => {
                                 </p>
                             )}
                         </div>
-                        
+
                         <div className="md:col-span-2">
                             <label htmlFor="description" className="block text-sm font-medium">
                                 Ticket Perks
                             </label>
                             <textarea
                                 id="ticketPerks"
-                                {...register('ticketPerks', { required: 'Ticket Perks is required' })}
+                                {...register('ticketPerks', {
+                                    setValueAs: (value: string) =>
+                                        value.split(',').map((perk) => perk.trim()).filter((perk) => perk),
+                                })}
                                 className="textarea textarea-bordered w-full bg-white text-[#6A0DAD]"
                                 placeholder="Enter Ticket Perks"
                                 rows={3}

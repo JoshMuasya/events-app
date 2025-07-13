@@ -9,6 +9,7 @@ import { Ticket, TicketManagerProps } from "@/lib/types";
 import { motion } from "framer-motion";
 import z from "zod";
 import toast from "react-hot-toast";
+import { useParams } from "next/navigation";
 
 // Animation variants
 const fadeInUp = {
@@ -30,7 +31,7 @@ const ticketSchema = z.object({
 // Define TicketForm type from the schema
 type TicketForm = z.infer<typeof ticketSchema>;
 
-const TicketManager: React.FC<TicketManagerProps> = ({ eventId }) => {
+const TicketManager: React.FC<TicketManagerProps> = () => {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [editingTicketId, setEditingTicketId] = useState<string | null>(null);
   const {
@@ -42,6 +43,7 @@ const TicketManager: React.FC<TicketManagerProps> = ({ eventId }) => {
   } = useForm<TicketForm>({
     resolver: zodResolver(ticketSchema),
   });
+  const { eventId } = useParams()
 
   useEffect(() => {
     const q = query(collection(db, "tickets"), where("eventId", "==", eventId));

@@ -5,7 +5,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Ticket, TicketManagerProps } from "@/lib/types";
+import { TicketManagerProps, TicketType } from "@/lib/types";
 import { motion } from "framer-motion";
 import z from "zod";
 import toast from "react-hot-toast";
@@ -32,7 +32,7 @@ const ticketSchema = z.object({
 type TicketForm = z.infer<typeof ticketSchema>;
 
 const TicketManager: React.FC<TicketManagerProps> = () => {
-  const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [tickets, setTickets] = useState<TicketType[]>([]);
   const [editingTicketId, setEditingTicketId] = useState<string | null>(null);
   const {
     register,
@@ -46,23 +46,28 @@ const TicketManager: React.FC<TicketManagerProps> = () => {
   const { eventId } = useParams()
 
   useEffect(() => {
-    const q = query(collection(db, "tickets"), where("eventId", "==", eventId));
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        setTickets(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Ticket)));
-      },
-      () => {
+    const fetchTickets = async () => {
+      try {
+        const response = await fetch(`/api/ticket?eventId=${eventId}`);
+        if (!response.ok) {
+          throw new Error("Failed to fetch tickets");
+        }
+        const data = await response.json();
+        setTickets(data);
+      } catch {
         toast.error("Failed to load tickets.");
       }
-    );
-    return () => unsubscribe();
+    };
+
+    if (eventId) {
+      fetchTickets();
+    }
   }, [eventId]);
 
   const onSubmit = async (data: TicketForm) => {
     if (!editingTicketId) return;
     try {
-      const response = await fetch("/api/update-ticket", {
+      const response = await fetch("/api/ticket/update-ticket", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ticketId: editingTicketId, updates: data }),
@@ -78,20 +83,32 @@ const TicketManager: React.FC<TicketManagerProps> = () => {
   };
 
   const handleDelete = async (ticketId: string) => {
-    if (!confirm("Are you sure you want to delete this ticket?")) return;
-    try {
-      await fetch("/api/delete-ticket", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ticketId }),
-      });
-      toast.success("Ticket deleted successfully!");
-    } catch {
-      toast.error("Failed to delete ticket.");
-    }
-  };
+  if (!confirm("Are you sure you want to delete this ticket?")) return;
+  try {
+    const response = await fetch("/api/ticket/delete-ticket", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ticketId }),
+    });
 
-  const startEditing = (ticket: Ticket) => {
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error('Delete ticket failed:', {
+        status: response.status,
+        error: errorData.error,
+        ticketId,
+      });
+      throw new Error(errorData.error || 'Failed to delete ticket');
+    }
+
+    toast.success("Ticket deleted successfully!");
+  } catch (error) {
+    console.error('Error in handleDelete:', error);
+    toast.error("Failed to delete ticket.");
+  }
+};
+
+  const startEditing = (ticket: TicketType) => {
     setEditingTicketId(ticket.id);
     setValue("type", ticket.type);
     setValue("price", ticket.price);
@@ -181,14 +198,14 @@ const TicketManager: React.FC<TicketManagerProps> = () => {
         </motion.div>
       )}
 
-      <div className="grid gap-4">
+      <div className="flex flex-row flex-wrap justify-around align-middle items-center">
         {tickets.length === 0 ? (
           <p className="text-gray-500">No tickets found for this event.</p>
         ) : (
           tickets.map((ticket) => (
             <motion.div
               key={ticket.id}
-              className="bg-white rounded-lg p-6 shadow-[0_4px_12px_rgba(106,13,173,0.15)]"
+              className="bg-gradient-to-br from-[#F7E7CE] via-[#FFD700] to-[#E5C07B] rounded-lg p-6 shadow-[0_4px_12px_rgba(106,13,173,0.15)] w-1/3"
               variants={fadeInUp}
               initial="hidden"
               animate="visible"

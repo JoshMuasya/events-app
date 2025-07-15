@@ -46,26 +46,27 @@ export function StaffEventActions({
                 >
                     <MdOutlineEventNote /> Send Event Link
                 </motion.button>
-                <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={handleManageRsvps}
-                    className="px-4 py-2 rounded text-white flex items-center gap-2"
-                    style={{ backgroundColor: event.primaryColor, color: event.secondaryColor }}
-                    aria-label="Manage RSVPs"
-                >
-                    <FiUsers /> Manage RSVPs
-                </motion.button>
-                {event.ticketEnabled && (
+                {event.ticketEnabled ? (
                     <motion.button
                         whileHover={{ scale: 1.05 }}
                         whileTap={{ scale: 0.95 }}
                         onClick={handleManageTickets}
-                        className="px-4 py-2 rounded bg-gray-500 text-white flex items-center gap-2"
+                        className="px-4 py-2 rounded text-white flex items-center gap-2"
                         style={{ backgroundColor: event.primaryColor, color: event.secondaryColor }}
                         aria-label="Manage Tickets"
                     >
                         <FiUsers /> Manage Tickets
+                    </motion.button>
+                ) : (
+                    <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={handleManageRsvps}
+                        className="px-4 py-2 rounded text-white flex items-center gap-2"
+                        style={{ backgroundColor: event.primaryColor, color: event.secondaryColor }}
+                        aria-label="Manage RSVPs"
+                    >
+                        <FiUsers /> Manage RSVPs
                     </motion.button>
                 )}
                 <motion.button

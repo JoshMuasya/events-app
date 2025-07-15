@@ -293,7 +293,7 @@ export interface TicketListProps {
   event: { title: string; description: string; date: string; location: string };
 }
 
-export interface Ticket {
+export interface TicketType {
   id: string;
   eventId: string;
   type: string;
@@ -321,4 +321,13 @@ export interface SelectedTicket {
   type: string;
   price: number;
   quantity: number;
+}
+
+export interface DeleteTicketRequest {
+  ticketId: string;
+}
+
+export interface UpdateTicketRequest {
+    ticketId: string;
+    updates: Partial<TicketForm>;
 }

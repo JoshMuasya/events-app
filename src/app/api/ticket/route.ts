@@ -1,6 +1,24 @@
 import { db } from "@/lib/firebase";
-import { collection, doc, setDoc } from "firebase/firestore";
+import { collection, doc, getDocs, query, setDoc, where } from "firebase/firestore";
 import { NextResponse } from "next/server";
+
+export async function GET(request: { url: string | URL; }) {
+    const { searchParams } = new URL(request.url)
+    const eventId = searchParams.get('eventId')
+
+    if(!eventId) {
+        return NextResponse.json({ error: "eventId is Required" }, { status: 400 })
+    }
+
+    const ticketQuery = query(collection(db, 'ticket'), where('eventId', '==', eventId));
+    const snapshot = await getDocs(ticketQuery);
+    const tickets = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+    }))
+
+    return NextResponse.json(tickets)
+}
 
 export async function POST(request: Request) {
     try {

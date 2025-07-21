@@ -290,7 +290,7 @@ export type SponsorOption = {
 
 export interface TicketListProps {
   eventId: string;
-  event: { title: string; description: string; date: string; location: string };
+  event: { eventName: string; eventDesc: string; date: string; location: string };
 }
 
 export interface TicketType {

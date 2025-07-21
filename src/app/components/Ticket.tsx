@@ -8,7 +8,7 @@ import { useParams } from 'next/navigation'
 import { AnimatePresence, motion } from 'framer-motion'
 import AddTicket from './AddTicket'
 import { FiChevronUp, FiPlus } from 'react-icons/fi'
-import { TicketType } from '@/lib/types'
+import { EventDetail, TicketType } from '@/lib/types'
 import toast from 'react-hot-toast'
 import TicketSkeleton from './TicketSkeleton'
 
@@ -18,6 +18,26 @@ const Ticket = () => {
   const [addingTicket, setAddingTicket] = useState(false)
   const [tickets, setTickets] = useState<TicketType[]>([])
   const [loading, setLoading] = useState(false)
+  const [event, setEvent] = useState<EventDetail>()
+
+  const fetchEvent = async () => {
+    try {
+      setLoading(true)
+
+      const response = await fetch(`/api/events/event-management/${eventId}`)
+      if (!response.ok) {
+        throw new Error("Failed to fetch Events")
+      }
+
+      const data = await response.json()
+      setEvent(data.event)
+    } catch (error) {
+      console.error("Error fetching Event:", error)
+      toast.error("Failed to load Event")
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const fetchTicket = async () => {
     try {
@@ -39,10 +59,11 @@ const Ticket = () => {
   if (eventId) {
     useEffect(() => {
       fetchTicket()
+      fetchEvent()
     }, [])
   }
 
-  console.log("Ticket", tickets)
+  console.log("Event", event?.eventName)
 
   const formVariants = {
     hidden: { opacity: 0, height: 0 },
@@ -115,12 +136,7 @@ const Ticket = () => {
           </motion.button>
 
           <TicketManager eventId={eventId} />
-          <TicketList eventId={eventId} event={{
-            title: '',
-            description: '',
-            date: '',
-            location: ''
-          }} />
+          
           <TicketAnalytics eventId={eventId} />
         </>
       )}

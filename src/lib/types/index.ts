@@ -321,6 +321,7 @@ export interface SelectedTicket {
   type: string;
   price: number;
   quantity: number;
+  buyerDetails?: BuyerDetails;
 }
 
 export interface DeleteTicketRequest {
@@ -330,4 +331,15 @@ export interface DeleteTicketRequest {
 export interface UpdateTicketRequest {
     ticketId: string;
     updates: Partial<TicketForm>;
+}
+
+export type Ticket = {
+  id: string;
+  quantity: number;
+};
+
+export interface BuyerDetails {
+    name: string;
+    email: string;
+    phone: string;
 }

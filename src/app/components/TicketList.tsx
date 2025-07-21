@@ -1,12 +1,12 @@
-
 "use client";
 
-import { EventDetail, SelectedTicket, TicketListProps, TicketType } from '@/lib/types';
+import { EventDetail, SelectedTicket, TicketListProps, TicketType, BuyerDetails } from '@/lib/types';
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
 import { useParams } from 'next/navigation';
 import QRCode from 'react-qr-code';
+import PaymentForm from './PaymentForm';
 
 const fadeInUp = {
     hidden: { opacity: 0, y: 30 },
@@ -14,123 +14,7 @@ const fadeInUp = {
     exit: { opacity: 0, y: -30, transition: { duration: 0.2 } },
 };
 
-// Payment Form Component
-const PaymentForm: React.FC<{
-    clientSecret: string;
-    selectedTickets: SelectedTicket[];
-    onSuccess: (purchasedTickets: SelectedTicket[]) => void;
-    onCancel: () => void;
-}> = ({ clientSecret, selectedTickets, onSuccess, onCancel }) => {
-    const [paymentLoading, setPaymentLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-    const [cardNumber, setCardNumber] = useState('');
-    const [expMonth, setExpMonth] = useState('');
-    const [expYear, setExpYear] = useState('');
-    const [cvc, setCvc] = useState('');
 
-    const handleSubmit = async (event: React.FormEvent) => {
-        event.preventDefault();
-        setPaymentLoading(true);
-        try {
-            const response = await fetch('/api/confirm-payment', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    clientSecret,
-                    paymentMethod: {
-                        card: {
-                            number: cardNumber,
-                            exp_month: parseInt(expMonth),
-                            exp_year: parseInt(expYear),
-                            cvc,
-                        },
-                    },
-                }),
-            });
-
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
-            const { error, paymentIntent } = await response.json();
-
-            if (error) {
-                setError(error.message || 'Payment failed');
-                toast.error(error.message || 'Payment failed');
-            } else if (paymentIntent?.status === 'succeeded') {
-                toast.success('Payment successful!');
-                onSuccess(selectedTickets);
-            }
-        } catch (err: unknown) {
-            const errorMessage = err instanceof Error ? err.message : 'Unknown payment error';
-            setError(errorMessage);
-            toast.error(errorMessage);
-        } finally {
-            setPaymentLoading(false);
-        }
-    };
-
-    return (
-        <motion.div
-            className="bg-[rgba(255,215,0,0.2)] backdrop-blur-md rounded-lg p-6 shadow-[0_4px_12px_rgba(106,13,173,0.3)] mt-6"
-            variants={fadeInUp}
-            initial="hidden"
-            animate="visible"
-            exit="exit"
-        >
-            <h2 className="text-lg font-semibold mb-4">Enter Payment Details</h2>
-            <form onSubmit={handleSubmit}>
-                <input
-                    type="text"
-                    placeholder="Card Number (e.g., 4242424242424242)"
-                    value={cardNumber}
-                    onChange={(e) => setCardNumber(e.target.value)}
-                    className="input input-bordered w-full mb-2 bg-white text-[#6A0DAD]"
-                />
-                <div className="flex gap-2">
-                    <input
-                        type="text"
-                        placeholder="MM"
-                        value={expMonth}
-                        onChange={(e) => setExpMonth(e.target.value)}
-                        className="input input-bordered w-full mb-2 bg-white text-[#6A0DAD]"
-                    />
-                    <input
-                        type="text"
-                        placeholder="YYYY"
-                        value={expYear}
-                        onChange={(e) => setExpYear(e.target.value)}
-                        className="input input-bordered w-full mb-2 bg-white text-[#6A0DAD]"
-                    />
-                    <input
-                        type="text"
-                        placeholder="CVC"
-                        value={cvc}
-                        onChange={(e) => setCvc(e.target.value)}
-                        className="input input-bordered w-full mb-2 bg-white text-[#6A0DAD]"
-                    />
-                </div>
-                {error && <p className="text-red-500 mt-2">{error}</p>}
-                <div className="flex gap-4 mt-4">
-                    <button
-                        type="submit"
-                        disabled={paymentLoading}
-                        className="btn bg-[#6A0DAD] text-white hover:bg-[#FFD700] hover:text-[#6A0DAD]"
-                    >
-                        {paymentLoading ? 'Processing...' : 'Confirm Payment'}
-                    </button>
-                    <button
-                        type="button"
-                        onClick={onCancel}
-                        className="btn bg-gray-300 text-[#6A0DAD] hover:bg-gray-400"
-                    >
-                        Cancel
-                    </button>
-                </div>
-            </form>
-        </motion.div>
-    );
-};
 
 const TicketList: React.FC<TicketListProps> = ({ event }) => {
     const params = useParams();
@@ -272,16 +156,75 @@ const TicketList: React.FC<TicketListProps> = ({ event }) => {
     };
 
     // Handle payment success
-    const handlePaymentSuccess = async (purchasedTickets: SelectedTicket[]) => {
-        await updateTicketAvailability(purchasedTickets); // Update availability
-        setPurchasedTickets(purchasedTickets); // Store purchased tickets
-        setSelectedTickets([]); // Clear selected tickets
-        setClientSecret(null); // Hide payment form
+    const handlePaymentSuccess = async (purchasedTickets: SelectedTicket[], buyerDetails: BuyerDetails) => {
+        const ticketsWithBuyer = purchasedTickets.map((ticket) => ({
+            ...ticket,
+            buyerDetails,
+        }));
+        await updateTicketAvailability(ticketsWithBuyer);
+        setPurchasedTickets(ticketsWithBuyer);
+        setSelectedTickets([]);
+        setClientSecret(null);
+
+        // Save purchase to Firestore
+        await savePurchase(ticketsWithBuyer);
+    };
+
+    // Save purchase to Firestore
+    const savePurchase = async (purchasedTickets: SelectedTicket[]) => {
+        try {
+            const response = await fetch('/api/save-purchase', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    eventId,
+                    tickets: purchasedTickets,
+                    purchaseDate: new Date().toISOString(),
+                }),
+            });
+            if (!response.ok) {
+                throw new Error(`Failed to save purchase: ${response.status}`);
+            }
+        } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            toast.error(`Failed to save purchase: ${errorMessage}`);
+        }
+    };
+
+    // Handle purchase cancellation
+    const handleCancelPurchase = async (ticket: SelectedTicket) => {
+        try {
+            const response = await fetch('/api/cancel-purchase', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    eventId,
+                    ticketId: ticket.id,
+                    quantity: ticket.quantity,
+                }),
+            });
+
+            if (!response.ok) {
+                throw new Error(`Failed to cancel purchase: ${response.status}`);
+            }
+
+            // Update local state
+            setPurchasedTickets((prev) => prev.filter((t) => t.id !== ticket.id));
+            setTickets((prev) =>
+                prev.map((t) =>
+                    t.id === ticket.id ? { ...t, availability: t.availability + ticket.quantity } : t
+                )
+            );
+            toast.success('Purchase cancelled successfully');
+        } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            toast.error(`Cancellation failed: ${errorMessage}`);
+        }
     };
 
     // Handle payment cancellation
     const handlePaymentCancel = () => {
-        setClientSecret(null); // Hide payment form
+        setClientSecret(null);
     };
 
     // Generate QR code data URL (async)
@@ -294,7 +237,6 @@ const TicketList: React.FC<TicketListProps> = ({ event }) => {
                 const root = createRoot(container);
                 root.render(<QRCode value={ticketId} size={150} />);
 
-                // Wait for rendering to complete
                 setTimeout(() => {
                     const svg = container.querySelector('svg');
                     if (!svg) {
@@ -341,8 +283,8 @@ const TicketList: React.FC<TicketListProps> = ({ event }) => {
 
     // Download ticket as HTML
     const downloadTicket = async (ticket: SelectedTicket) => {
-        const ticketId = `${eventId}-${ticket.id}-${Date.now()}`; // Unique ticket ID
-        const qrCodeData = await generateQRCodeDataURL(ticketId); // Wait for QR code data
+        const ticketId = `${eventId}-${ticket.id}-${Date.now()}`;
+        const qrCodeData = await generateQRCodeDataURL(ticketId);
 
         if (!qrCodeData) {
             toast.error('Failed to generate QR code');
@@ -365,6 +307,9 @@ const TicketList: React.FC<TicketListProps> = ({ event }) => {
             <body>
                 <div class="ticket">
                     <h1>${event.eventName}</h1>
+                    <p>Buyer: ${ticket.buyerDetails?.name}</p>
+                    <p>Email: ${ticket.buyerDetails?.email}</p>
+                    <p>Phone: ${ticket.buyerDetails?.phone}</p>
                     <p>Ticket Type: ${ticket.type}</p>
                     <p>Quantity: ${ticket.quantity}</p>
                     <p>Price: KSh ${(ticket.price * ticket.quantity).toFixed(2)}</p>
@@ -461,6 +406,7 @@ const TicketList: React.FC<TicketListProps> = ({ event }) => {
                 <PaymentForm
                     clientSecret={clientSecret}
                     selectedTickets={selectedTickets}
+                    eventId={eventId}
                     onSuccess={handlePaymentSuccess}
                     onCancel={handlePaymentCancel}
                 />
@@ -481,6 +427,11 @@ const TicketList: React.FC<TicketListProps> = ({ event }) => {
                                 </span>
                                 <span>KSh {(ticket.price * ticket.quantity).toFixed(2)}</span>
                             </div>
+                            <div className="mb-2">
+                                <p>Buyer: {ticket.buyerDetails?.name}</p>
+                                <p>Email: {ticket.buyerDetails?.email}</p>
+                                <p>Phone: {ticket.buyerDetails?.phone}</p>
+                            </div>
                             <div className="flex justify-center" style={{ background: 'white', padding: '16px' }}>
                                 <QRCode value={`${eventId}-${ticket.id}-${Date.now()}`} size={150} />
                             </div>
@@ -493,7 +444,7 @@ const TicketList: React.FC<TicketListProps> = ({ event }) => {
                         </div>
                     ))}
                     <button
-                        onClick={() => setPurchasedTickets([])} // Fixed: Changed setPurchasedTickets to onClick
+                        onClick={() => setPurchasedTickets([])}
                         className="btn bg-gray-300 text-[#6A0DAD] hover:bg-gray-400 w-full mt-4"
                     >
                         Back to Ticket Selection

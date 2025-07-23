@@ -11,6 +11,7 @@ import { FiChevronUp, FiPlus } from 'react-icons/fi'
 import { EventDetail, TicketType } from '@/lib/types'
 import toast from 'react-hot-toast'
 import TicketSkeleton from './TicketSkeleton'
+import SearchTickets from './SearchTickets'
 
 const Ticket = () => {
   const params = useParams()
@@ -138,6 +139,8 @@ const Ticket = () => {
           <TicketManager eventId={eventId} />
           
           <TicketAnalytics eventId={eventId} />
+
+          <SearchTickets />
         </>
       )}
     </motion.div>

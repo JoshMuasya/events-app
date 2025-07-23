@@ -118,7 +118,7 @@ const TicketManager: React.FC<TicketManagerProps> = () => {
   };
 
   return (
-    <div className="space-y-6 text-[#6A0DAD]">
+    <div className="space-y-6 text-[#6A0DAD] mb-3 md:mb-5">
       <h2 className="text-xl font-bold">Manage Tickets</h2>
 
       {editingTicketId && (

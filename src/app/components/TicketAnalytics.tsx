@@ -12,8 +12,9 @@ interface TicketAnalyticsProps {
 }
 
 interface AnalyticsData {
-  name: string;
-  value: number;
+  type: string;
+  sold: number;
+  revenue: number;
 }
 
 const fadeInUp = {
@@ -28,26 +29,20 @@ const TicketAnalytics: React.FC<TicketAnalyticsProps> = ({ eventId }) => {
   useEffect(() => {
     const fetchAnalytics = async () => {
       try {
-        const ticketsQuery = query(collection(db, "tickets"), where("eventId", "==", eventId));
-        const snapshot = await getDocs(ticketsQuery);
-        const tickets = snapshot.docs.map(doc => doc.data() as any);
+        const res = await fetch("/api/ticket/analytics", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ eventId }),
+        });
 
-        const ticketsSold = tickets.reduce((sum, ticket) => {
-          const sold = (ticket.availability || 0) - (ticket.remaining ?? (ticket?.availability || 0));
-          return sum + sold;
-        }, 0);
+        if (!res.ok) throw new Error("Failed to fetch analytics");
 
-        const totalRevenue = tickets.reduce((sum, ticket) => {
-          const sold = (ticket.availability || 0) - (ticket.remaining ?? (ticket?.availability || 0));
-          return sum + (ticket.price || 0) * sold;
-        }, 0);
-
-        setData([
-          { name: "Tickets Sold", value: ticketsSold },
-          { name: "Total Revenue ($)", value: totalRevenue },
-        ]);
+        const { chartData } = await res.json();
+        setData(chartData);
       } catch (error) {
-        console.error("Error loading analytics:", error);
+        console.error("Error fetching analytics:", error);
       } finally {
         setLoading(false);
       }
@@ -55,6 +50,9 @@ const TicketAnalytics: React.FC<TicketAnalyticsProps> = ({ eventId }) => {
 
     fetchAnalytics();
   }, [eventId]);
+
+
+  console.log("Data", data)
 
   return (
     <motion.div
@@ -73,10 +71,11 @@ const TicketAnalytics: React.FC<TicketAnalyticsProps> = ({ eventId }) => {
           <ResponsiveContainer width="100%" height={300}>
             <BarChart data={data} margin={{ top: 20, right: 30, left: 10, bottom: 10 }}>
               <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="name" />
+              <XAxis dataKey="type" />
               <YAxis />
               <Tooltip />
-              <Bar dataKey="value" fill="#6A0DAD" />
+              <Bar dataKey="sold" fill="#6A0DAD" name="Tickets Sold" />
+              <Bar dataKey="revenue" fill="#DAA520" name="Revenue ($)" />
             </BarChart>
           </ResponsiveContainer>
         )}

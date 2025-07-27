@@ -4,95 +4,95 @@ import { UseFormReturn } from "react-hook-form";
 export type Role = 'Admin' | 'Organizer' | 'Staff';
 
 export interface AuthContextType {
-    user: any; // Replace with firebase.User | null for better typing
-    role: Role | null;
-    loading: boolean;
+  user: any; // Replace with firebase.User | null for better typing
+  role: Role | null;
+  loading: boolean;
 }
 
 export const AuthContext = createContext<AuthContextType>({
-    user: null,
-    role: null,
-    loading: true,
+  user: null,
+  role: null,
+  loading: true,
 });
 
 export interface User {
-    id: string;
-    name: string;
-    email: string;
-    phone: string;
-    image: string | File;
-    role: Role
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  image: string | File;
+  role: Role
 }
 
 export interface UserDetail {
-    id: string;
-    name: string;
-    email: string;
-    phone: string;
-    image: string | null;
-    role: Role;
-    photoURL: string | null;
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  image: string | null;
+  role: Role;
+  photoURL: string | null;
 }
 
 export type FormState = Omit<User, 'id'> & { image: string | File };
 
 export type UserTableProps = {
-    users: User[];
+  users: User[];
 };
 
 export interface UserEditProps {
-    users: User;
-    onUserUpdated?: () => void;
+  users: User;
+  onUserUpdated?: () => void;
 }
 
 export type UserField = "name" | "email" | "phone" | "role";
 
 export interface UserEvent {
-    id: string;
-    name: string;
+  id: string;
+  name: string;
 }
 
 export interface EventDetail {
-    id: string;
-    eventName: string;
-    date: string;
-    status: "Draft" | "Ongoing" | "Cancelled" | "Published" | "Completed";
-    location: string;
-    coordinates?: { lat: number; lng: number };
-    isVirtual: boolean;
-    ticketSales: number;
-    totalRevenue: number;
-    ticketsSoldPercentage: number;
-    attendeeDemographics: { ageGroup: string; count: number }[];
-    engagementScore: number;
-    image?: string;
-    createdBy: string;
-    createdByName: string;
-    assignedStaff: string[];
-    assignedStaffNames: string[];
-    invitesOnly: boolean;
-    maxAttendees?: number;
-    contactPhone: string;
-    contactEmail: string;
-    accessibilityInfo: string;
-    tags: string;
-    category: "Conference" | "Workshop" | "Concert" | "Networking"
-    waitlistLimit: number;
-    waitlistEnabled: boolean;
-    ticketPrice: number;
-    ticketEnabled: boolean;
-    speakers: string[];
-    agenda: string;
-    eventDesc: string;
-    bodyFont: "Roboto" | "Open Sans" | "Montserrat" | "Lora";
-    headingFont: "Roboto" | "Open Sans" | "Montserrat" | "Lora";
-    textColor: string;
-    backgroundColor: string;
-    secondaryColor: string;
-    primaryColor: string;
-    direction: string;
-    sponsors: string[];
-    attendies: Attendees;
+  id: string;
+  eventName: string;
+  date: string;
+  status: "Draft" | "Ongoing" | "Cancelled" | "Published" | "Completed";
+  location: string;
+  coordinates?: { lat: number; lng: number };
+  isVirtual: boolean;
+  ticketSales: number;
+  totalRevenue: number;
+  ticketsSoldPercentage: number;
+  attendeeDemographics: { ageGroup: string; count: number }[];
+  engagementScore: number;
+  image?: string;
+  createdBy: string;
+  createdByName: string;
+  assignedStaff: string[];
+  assignedStaffNames: string[];
+  invitesOnly: boolean;
+  maxAttendees?: number;
+  contactPhone: string;
+  contactEmail: string;
+  accessibilityInfo: string;
+  tags: string;
+  category: "Conference" | "Workshop" | "Concert" | "Networking"
+  waitlistLimit: number;
+  waitlistEnabled: boolean;
+  ticketPrice: number;
+  ticketEnabled: boolean;
+  speakers: string[];
+  agenda: string;
+  eventDesc: string;
+  bodyFont: "Roboto" | "Open Sans" | "Montserrat" | "Lora";
+  headingFont: "Roboto" | "Open Sans" | "Montserrat" | "Lora";
+  textColor: string;
+  backgroundColor: string;
+  secondaryColor: string;
+  primaryColor: string;
+  direction: string;
+  sponsors: string[];
+  attendies: Attendees;
 }
 
 export type EventEditData = {
@@ -131,151 +131,151 @@ export type EventEditData = {
 };
 
 export interface Sponsors {
-    sponsorId: string;
-    sponsorName: string;
-    sponsorLogo: string;
+  sponsorId: string;
+  sponsorName: string;
+  sponsorLogo: string;
 }
 
 export interface Attendees {
-    maxAttendies: string;
-    currentAttendies: string;
+  maxAttendies: string;
+  currentAttendies: string;
 }
 
 export interface Speakers {
-    id: string;
-    speakerName: string;
-    description: string;
-    profileImage: string | null;
+  id: string;
+  speakerName: string;
+  description: string;
+  profileImage: string | null;
 }
 
 export interface EventStyling {
-    bodyFont: "Roboto" | "Open Sans" | "Montserrat" | "Lora";
-    headingFont: "Roboto" | "Open Sans" | "Montserrat" | "Lora";
-    textColor: string;
-    backgroundColor: string;
-    secondaryColor: string;
-    primaryColor: string;
+  bodyFont: "Roboto" | "Open Sans" | "Montserrat" | "Lora";
+  headingFont: "Roboto" | "Open Sans" | "Montserrat" | "Lora";
+  textColor: string;
+  backgroundColor: string;
+  secondaryColor: string;
+  primaryColor: string;
 }
 
 export type EventHeaderProps = {
-    event: EventDetail;
-    liveData: { attendees: number; ticketsRemaining: number | string };
+  event: EventDetail;
+  liveData: { attendees: number; ticketsRemaining: number | string };
 };
 
 export type EventSponsorsProps = {
-    sponsors: string[];
-    secondaryColor: string;
+  sponsors: string[];
+  secondaryColor: string;
 };
 
 export type EventSpeakersProps = {
-    speakers: string[];
+  speakers: string[];
 };
 
 export type EventSponsorsIdProps = {
-    sponsors: string[][];
+  sponsors: string[][];
 };
 
 export type EventDescriptionProps = {
-    description: string;
+  description: string;
 };
 
 export type EventMapProps = {
-    isVirtual: boolean;
-    direction?: string | null;
+  isVirtual: boolean;
+  direction?: string | null;
 };
 
 export type EventActionsProps = {
-    isStaff: boolean;
-    event: EventDetail;
-    user: any | null;
-    isEventOver: boolean;
-    rsvpForm: UseFormReturn<{ name: string; email: string }>;
-    ticketCheckForm: UseFormReturn<{ email: string; code: string }>;
-    rsvpResult: string | null;
-    ticketInfo: { code: string; qrCode: string } | null;
-    waitlistJoined: boolean;
-    handleRsvpSubmit: (data: { name: string; email: string }) => Promise<void>;
-    handleTicketCheckSubmit: (data: { email: string; code: string }) => Promise<void>;
-    handlePurchaseTickets: () => Promise<void>;
-    handleEdit: () => void;
-    handleDelete: () => Promise<void>;
-    handleManageRsvps: () => void;
-    handleManageTickets: () => void;
+  isStaff: boolean;
+  event: EventDetail;
+  user: any | null;
+  isEventOver: boolean;
+  rsvpForm: UseFormReturn<{ name: string; email: string }>;
+  ticketCheckForm: UseFormReturn<{ email: string; code: string }>;
+  rsvpResult: string | null;
+  ticketInfo: { code: string; qrCode: string } | null;
+  waitlistJoined: boolean;
+  handleRsvpSubmit: (data: { name: string; email: string }) => Promise<void>;
+  handleTicketCheckSubmit: (data: { email: string; code: string }) => Promise<void>;
+  handlePurchaseTickets: () => Promise<void>;
+  handleEdit: () => void;
+  handleDelete: () => Promise<void>;
+  handleManageRsvps: () => void;
+  handleManageTickets: () => void;
 };
 
 export type VirtualEventFeaturesProps = {
-    isVirtual: boolean;
+  isVirtual: boolean;
 };
 
 export type EventFeedbackProps = {
-    isEventOver: boolean;
-    showFeedback: boolean;
-    feedbackForm: UseFormReturn<{ rating: number; comments?: string }>;
-    handleFeedbackSubmit: (data: { rating: number; comments?: string }) => Promise<void>;
-    setShowFeedback: (value: boolean) => void;
-    primaryColor: string;
+  isEventOver: boolean;
+  showFeedback: boolean;
+  feedbackForm: UseFormReturn<{ rating: number; comments?: string }>;
+  handleFeedbackSubmit: (data: { rating: number; comments?: string }) => Promise<void>;
+  setShowFeedback: (value: boolean) => void;
+  primaryColor: string;
 };
 
 export type EventAnalyticsProps = {
-    isStaff: boolean;
-    eventId: string;
+  isStaff: boolean;
+  eventId: string;
 };
 
 export type EventSidebarProps = {
-    event: EventDetail;
-    handleAddToCalendar: () => void;
-    shareEvent: (platform: string) => void;
+  event: EventDetail;
+  handleAddToCalendar: () => void;
+  shareEvent: (platform: string) => void;
 };
 
 type RecommendedEvent = {
-    id: string;
-    eventName: string;
-    date: string;
-    image?: string;
+  id: string;
+  eventName: string;
+  date: string;
+  image?: string;
 };
 
 export type RecommendedEventsProps = {
-    recommendedEvents: RecommendedEvent[];
-    primaryColor: string;
+  recommendedEvents: RecommendedEvent[];
+  primaryColor: string;
 };
 
 export type ErrorStateProps = {
-    error: string | null;
-    errorSource?: string;
-    errorDetails?: string;
+  error: string | null;
+  errorSource?: string;
+  errorDetails?: string;
 };
 
 export interface EventLayoutProps {
-    event: EventDetail;
-    children: React.ReactNode;
+  event: EventDetail;
+  children: React.ReactNode;
 }
 
 export type RecommendedEventHook = {
-    id: string;
-    eventName: string;
-    date: string;
-    image?: string;
+  id: string;
+  eventName: string;
+  date: string;
+  image?: string;
 };
 
 export interface StaffEventActionsProps {
-    isStaff: boolean;
-    event: EventDetail;
-    handleEdit: () => void;
-    handleDelete: () => Promise<void>;
-    handleManageRsvps: () => void;
-    handleManageTickets: () => void;
-    handleSendEventLink: () => void;
+  isStaff: boolean;
+  event: EventDetail;
+  handleEdit: () => void;
+  handleDelete: () => Promise<void>;
+  handleManageRsvps: () => void;
+  handleManageTickets: () => void;
+  handleSendEventLink: () => void;
 }
 
 export interface GuestEventActionsProps {
-    event: EventDetail;
-    handleGuestRsvp: () => void;
-    handleBuyTickets: () => void;
+  event: EventDetail;
+  handleGuestRsvp: () => void;
+  handleBuyTickets: () => void;
 }
 
 export type StaffOption = {
-    value: string;
-    label: string;
+  value: string;
+  label: string;
 };
 
 export type SpeakerOption = {
@@ -329,8 +329,8 @@ export interface DeleteTicketRequest {
 }
 
 export interface UpdateTicketRequest {
-    ticketId: string;
-    updates: Partial<TicketForm>;
+  ticketId: string;
+  updates: Partial<TicketForm>;
 }
 
 export type Ticket = {
@@ -339,7 +339,108 @@ export type Ticket = {
 };
 
 export interface BuyerDetails {
+  name: string;
+  email: string;
+  phone: string;
+}
+
+export interface GiftItem {
+  id: string;
+  name: string;
+  description: string;
+  price: number;
+  image: string;
+  vendor: string;
+  category: string;
+  available: boolean;
+}
+
+export interface GiftCardProps {
+  gift: GiftItem;
+  onSelect: (gift: GiftItem) => void;
+  onWishlist?: (gift: GiftItem) => void;
+  isWishlisted?: boolean;
+}
+
+export interface GiftItem {
+  id: string;
+  name: string;
+  description: string;
+  price: number;
+  image: string;
+  vendor: string;
+  category: string;
+  available: boolean;
+}
+
+export interface EventInfo {
+  name: string;
+  host: string;
+  date: string;
+  type: string;
+  guestCount: number;
+}
+
+export interface GuestGiftFlowProps {
+  eventName: string;
+  hostName: string;
+  giftRegistry: GiftItem[];
+}
+
+export interface ReceivedGift {
+  id: string;
+  giftName: string;
+  senderName: string;
+  message: string;
+  amount: number;
+  isAnonymous: boolean;
+  timestamp: Date;
+  status: "pending" | "confirmed" | "thanked";
+  image: string;
+}
+
+export interface RegistryItem {
+  id: string;
+  name: string;
+  description: string;
+  price: number;
+  image: string;
+  vendor: string;
+  category: string;
+  link?: string;
+  received: boolean;
+}
+
+export interface VendorProduct {
+  id: string;
+  name: string;
+  description: string;
+  price: number;
+  originalPrice?: number;
+  image: string;
+  vendor: {
     name: string;
-    email: string;
-    phone: string;
+    logo: string;
+    rating: number;
+    deliveryTime: string;
+  };
+  category: string;
+  inStock: boolean;
+  rating: number;
+  reviewCount: number;
+  features: string[];
+}
+
+export interface VendorCatalogProps {
+  onAddToRegistry: (product: VendorProduct) => void;
+}
+
+export interface GuestGiftManagementProps {
+  eventInfo: EventInfo
+  giftRegistry: GiftItem[]
+}
+
+export interface GiftManagementProps {
+  eventInfo: EventInfo
+  giftRegistry: GiftItem[]
 }

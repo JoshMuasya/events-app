@@ -401,6 +401,8 @@ export interface ReceivedGift {
 
 export interface RegistryItem {
   id: string;
+  registryId: string;
+  eventId: string;
   name: string;
   description: string;
   price: number;
@@ -409,6 +411,8 @@ export interface RegistryItem {
   category: string;
   link?: string;
   received: boolean;
+  createdAt: string;
+  updatedAt?: string;
 }
 
 export interface VendorProduct {

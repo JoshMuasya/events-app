@@ -6,9 +6,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
+import { storage } from '@/lib/firebase';
 import { EventDetail, GiftManagementProps, ReceivedGift, RegistryItem } from '@/lib/types';
+import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import { motion } from 'framer-motion';
-import { Badge, Check, DollarSign, Download, Gift, Heart, MapPin, Package, Plus } from 'lucide-react';
+import { Badge, Check, DollarSign, Download, Edit, Gift, Heart, MapPin, Package, Plus, Trash } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import React, { useEffect, useState } from 'react'
 import toast from 'react-hot-toast';
@@ -24,6 +26,12 @@ const HostDashboard = ({ eventInfo, giftRegistry }: GiftManagementProps) => {
     const eventId = params.eventId as string;
     const [loading, setLoading] = useState(false)
     const [event, setEvent] = useState<EventDetail | null>(null)
+    const [imagePreview, setImagePreview] = useState("");
+    const [newItemImage, setNewItemImage] = useState<File | null>(null);
+    const [newItemVendor, setNewItemVendor] = useState("");
+    const [newItemCategory, setNewItemCategory] = useState("");
+    const [editItemId, setEditItemId] = useState<string | null>(null);
+    const [registry, setRegistry] = useState<RegistryItem[]>([])
 
     const fetchEvent = async () => {
         try {
@@ -43,8 +51,30 @@ const HostDashboard = ({ eventInfo, giftRegistry }: GiftManagementProps) => {
         }
     }
 
+    const fetchRegistry = async () => {
+        try {
+            setLoading(true);
+            console.log("Fetching registry for eventId:", eventId);
+            const response = await fetch(`/api/registry/${eventId}`);
+            if (!response.ok) {
+                const errorData = await response.json();
+                console.error("API Error:", errorData);
+                throw new Error(`Failed to fetch registry items: ${errorData.error || 'Unknown error'}`);
+            }
+            const registryItems = await response.json();
+            console.log("Fetched registry items:", registryItems);
+            setRegistry(registryItems);
+        } catch (error: any) {
+            console.error("Error fetching registry items:", error.message);
+            toast.error(error.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     useEffect(() => {
         fetchEvent()
+        fetchRegistry()
     }, [])
 
     // Mock data
@@ -73,41 +103,9 @@ const HostDashboard = ({ eventInfo, giftRegistry }: GiftManagementProps) => {
         }
     ]);
 
-    const [registry, setRegistry] = useState<RegistryItem[]>([
-        {
-            id: "1",
-            name: "Crystal Wine Glasses Set",
-            description: "Elegant crystal wine glasses for special occasions",
-            price: 8500,
-            image: "https://images.unsplash.com/photo-1566834308134-a5e0ad1f64e3?w=300&h=300&fit=crop",
-            vendor: "HomeEssentials",
-            category: "Kitchen",
-            received: true
-        },
-        {
-            id: "2",
-            name: "Premium Coffee Maker",
-            description: "Professional-grade coffee maker with multiple brewing options",
-            price: 15000,
-            image: "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=300&h=300&fit=crop",
-            vendor: "TechHome",
-            category: "Kitchen",
-            received: false
-        }
-    ]);
-
     const totalValue = receivedGifts.reduce((sum, gift) => sum + gift.amount, 0);
     const confirmedGifts = receivedGifts.filter(gift => gift.status === "confirmed").length;
     const pendingGifts = receivedGifts.filter(gift => gift.status === "pending").length;
-
-    const handleConfirmGift = (giftId: string) => {
-        setReceivedGifts(prev =>
-            prev.map(gift =>
-                gift.id === giftId ? { ...gift, status: "confirmed" } : gift
-            )
-        );
-        toast("Gift Confirmed Gift has been marked as received.");
-    };
 
     const handleSendThankYou = (giftId: string) => {
         setReceivedGifts(prev =>
@@ -118,29 +116,179 @@ const HostDashboard = ({ eventInfo, giftRegistry }: GiftManagementProps) => {
         toast("Thank You Sent! Your thank you message has been sent.");
     };
 
-    const handleAddToRegistry = () => {
-        if (!newItemName || !newItemDescription || !newItemPrice) return;
+    // Handle image file selection
+    const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file && file.type.startsWith('image/')) {
+            setNewItemImage(file);
+            setImagePreview(URL.createObjectURL(file));
+        } else {
+            toast.error("Please select a valid image file (PNG, JPEG)");
+            setNewItemImage(null);
+            setImagePreview("");
+        }
+    };
 
-        const newItem: RegistryItem = {
-            id: Date.now().toString(),
+    // Upload image to Firebase Storage
+    const uploadImage = async (file: File | null): Promise<string | null> => {
+        if (!file) return null;
+        try {
+            const storageRef = ref(storage, `registry_images/${eventId}/${Date.now()}_${file.name}`);
+            await uploadBytes(storageRef, file);
+            const downloadURL = await getDownloadURL(storageRef);
+            return downloadURL;
+        } catch (error) {
+            console.error("Error uploading image:", error);
+            throw new Error("Failed to upload image");
+        }
+    };
+
+    const handleAddToRegistry = async () => {
+        if (!newItemName || !newItemDescription || !newItemPrice) {
+            toast.error("Please fill all required fields")
+            return
+        }
+
+        let imageUrl = "https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=300&h=300&fit=crop";
+        if (newItemImage) {
+            try {
+                const uploadedUrl = await uploadImage(newItemImage);
+                if (uploadedUrl) {
+                    imageUrl = uploadedUrl;
+                }
+            } catch (error) {
+                toast.error("Failed to upload image");
+                return;
+            }
+        }
+
+        const registryData = {
+            eventId,
             name: newItemName,
             description: newItemDescription,
             price: parseFloat(newItemPrice),
-            image: "https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=300&h=300&fit=crop",
-            vendor: "Custom",
-            category: "Custom",
+            image: imageUrl,
+            vendor: newItemVendor,
+            category: newItemCategory,
             link: newItemLink,
-            received: false
+            received: false,
         };
 
-        setRegistry(prev => [...prev, newItem]);
-        setNewItemName("");
-        setNewItemDescription("");
-        setNewItemPrice("");
-        setNewItemLink("");
-        setIsAddDialogOpen(false);
+        try {
+            const endpoint = editItemId ? `/api/registry/item/${editItemId}` : '/api/registry';
+            const method = editItemId ? 'PATCH' : 'POST';
+            console.log("Sending request to:", endpoint, "Method:", method, "Data:", registryData); // Debug log
+            const response = await fetch(endpoint, {
+                method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(registryData),
+            });
+            if (!response.ok) {
+                const errorData = await response.json();
+                console.error("API Error:", errorData); // Debug log
+                throw new Error(`Failed to ${editItemId ? 'update' : 'add'} registry item: ${errorData.error || 'Unknown error'}`);
+            }
+            const updatedItem = await response.json();
+            if (editItemId) {
+                setRegistry((prev) => prev.map(item => item.id === editItemId ? updatedItem : item));
+            } else {
+                setRegistry((prev) => [...prev, updatedItem]);
+            }
+            setNewItemName("");
+            setNewItemDescription("");
+            setNewItemPrice("");
+            setNewItemLink("");
+            setNewItemImage(null);
+            setNewItemVendor("");
+            setNewItemCategory("");
+            setImagePreview("");
+            setIsAddDialogOpen(false);
+            setEditItemId(null);
+            toast.success(`Registry item ${editItemId ? 'updated' : 'added'} successfully`);
+        } catch (error) {
+            console.error(`Error ${editItemId ? 'updating' : 'adding'} registry item:`, error);
+            toast.error(`Failed to ${editItemId ? 'update' : 'add'} registry item`);
+        }
+    };
 
-        toast("Item Added New item has been added to your registry.");
+    // Delete registry item
+    const handleDeleteRegistryItem = async (itemId: string) => {
+        try {
+            const response = await fetch(`/api/registry/item/${itemId}`, {
+                method: 'DELETE',
+            });
+            if (!response.ok) throw new Error("Failed to delete registry item");
+            setRegistry((prev) => prev.filter(item => item.id !== itemId));
+            toast.success("Registry item deleted successfully");
+        } catch (error) {
+            console.error("Error deleting registry item:", error);
+            toast.error("Failed to delete registry item");
+        }
+    };
+
+    // Edit registry item
+    const handleEditRegistryItem = (item: any) => {
+        console.log("Editing item with id:", item.id); // Debug log
+        setNewItemName(item.name);
+        setNewItemDescription(item.description);
+        setNewItemPrice(item.price.toString());
+        setNewItemLink(item.link || "");
+        setNewItemImage(null);
+        setImagePreview(item.image);
+        setNewItemVendor(item.vendor || "");
+        setNewItemCategory(item.category || "");
+        setEditItemId(item.id);
+        setIsAddDialogOpen(true);
+    };
+
+    // Confirm gift
+    const handleConfirmGift = async (giftId: string) => {
+        // try {
+        //   const response = await fetch(`/api/gifts/${giftId}`, {
+        //     method: 'PATCH',
+        //     headers: { 'Content-Type': 'application/json' },
+        //     body: JSON.stringify({ status: 'confirmed' }),
+        //   });
+        //   if (!response.ok) throw new Error("Failed to confirm gift");
+        //   setReceivedGifts((prev) =>
+        //     prev.map((gift) =>
+        //       gift.id === giftId ? { ...gift, status: 'confirmed' } : gift
+        //     )
+        //   );
+        //   const gift = receivedGifts.find(g => g.id === giftId);
+        //   const registryItem = registry.find(r => r.name === gift.giftName);
+        //   if (registryItem && !registryItem.received) {
+        //     await fetch(`/api/registry/${registryItem.id}`, {
+        //       method: 'PATCH',
+        //       headers: { 'Content-Type': 'application/json' },
+        //       body: JSON.stringify({ received: true }),
+        //     });
+        //     setRegistry((prev) =>
+        //       prev.map((item) =>
+        //         item.id === registryItem.id ? { ...item, received: true } : item
+        //       )
+        //     );
+        //   }
+        //   toast.success("Gift confirmed successfully");
+        // } catch (error) {
+        //   console.error("Error confirming gift:", error);
+        //   toast.error("Failed to confirm gift");
+        // }
+    };
+
+    // Delete gift
+    const handleDeleteGift = async (giftId: string) => {
+        try {
+            const response = await fetch(`/api/gifts/${giftId}`, {
+                method: 'DELETE',
+            });
+            if (!response.ok) throw new Error("Failed to delete gift");
+            setReceivedGifts((prev) => prev.filter((gift) => gift.id !== giftId));
+            toast.success("Gift deleted successfully");
+        } catch (error) {
+            console.error("Error deleting gift:", error);
+            toast.error("Failed to delete gift");
+        }
     };
 
     const exportGiftList = () => {
@@ -181,7 +329,6 @@ const HostDashboard = ({ eventInfo, giftRegistry }: GiftManagementProps) => {
     return (
         <div className="my-24 min-h-screen bg-[rgba(255,215,0,0.2)] backdrop-blur-md w-2/3">
             <div className="container mx-auto px-4 py-8">
-                {/* Header */}
                 <motion.div
                     initial={{ opacity: 0, y: -20 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -341,6 +488,15 @@ const HostDashboard = ({ eventInfo, giftRegistry }: GiftManagementProps) => {
                                                                 Send Thank You
                                                             </Button>
                                                         )}
+                                                        <Button
+                                                            size="sm"
+                                                            variant="destructive"
+                                                            onClick={() => handleDeleteGift(gift.id)}
+                                                            className="bg-red-600 text-white hover:bg-red-700"
+                                                        >
+                                                            <Trash className="w-4 h-4 mr-1" />
+                                                            Delete
+                                                        </Button>
                                                     </div>
                                                 </div>
                                             </div>
@@ -354,7 +510,20 @@ const HostDashboard = ({ eventInfo, giftRegistry }: GiftManagementProps) => {
                     <TabsContent value="registry" className="space-y-6">
                         <div className="flex justify-between items-center">
                             <h2 className="text-xl font-semibold text-[#6A0DAD]">Gift Registry</h2>
-                            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+                            <Dialog open={isAddDialogOpen} onOpenChange={(open) => {
+                                setIsAddDialogOpen(open);
+                                if (!open) {
+                                    setEditItemId(null);
+                                    setNewItemName("");
+                                    setNewItemDescription("");
+                                    setNewItemPrice("");
+                                    setNewItemLink("");
+                                    setNewItemImage(null);
+                                    setNewItemVendor("");
+                                    setNewItemCategory("");
+                                    setImagePreview("");
+                                }
+                            }}>
                                 <DialogTrigger asChild>
                                     <Button className="bg-[#6A0DAD] text-white hover:bg-[#FFD700] hover:text-[#6A0DAD]">
                                         <Plus className="w-4 h-4 mr-2" />
@@ -363,7 +532,9 @@ const HostDashboard = ({ eventInfo, giftRegistry }: GiftManagementProps) => {
                                 </DialogTrigger>
                                 <DialogContent className="bg-[rgba(255,215,0,0.2)] backdrop-blur-md shadow-[0_4px_12px_rgba(106,13,173,0.3)]">
                                     <DialogHeader>
-                                        <DialogTitle className="text-[#6A0DAD]">Add New Registry Item</DialogTitle>
+                                        <DialogTitle className="text-[#6A0DAD]">
+                                            {editItemId ? "Edit Registry Item" : "Add New Registry Item"}
+                                        </DialogTitle>
                                     </DialogHeader>
                                     <div className="space-y-4">
                                         <Input
@@ -391,11 +562,39 @@ const HostDashboard = ({ eventInfo, giftRegistry }: GiftManagementProps) => {
                                             onChange={(e) => setNewItemLink(e.target.value)}
                                             className="bg-white text-[#6A0DAD] border-[#6A0DAD]"
                                         />
+                                        <div>
+                                            <label className="text-sm text-[#6A0DAD] mb-1 block">Upload Image (optional)</label>
+                                            <Input
+                                                type="file"
+                                                accept="image/*"
+                                                onChange={handleImageChange}
+                                                className="bg-white text-[#6A0DAD] border-[#6A0DAD]"
+                                            />
+                                            {imagePreview && (
+                                                <img
+                                                    src={imagePreview}
+                                                    alt="Preview"
+                                                    className="mt-2 w-32 h-32 object-cover rounded-md"
+                                                />
+                                            )}
+                                        </div>
+                                        <Input
+                                            placeholder="Vendor (e.g., Amazon, HomeDepot)"
+                                            value={newItemVendor}
+                                            onChange={(e) => setNewItemVendor(e.target.value)}
+                                            className="bg-white text-[#6A0DAD] border-[#6A0DAD]"
+                                        />
+                                        <Input
+                                            placeholder="Category (e.g., Kitchen, Furniture)"
+                                            value={newItemCategory}
+                                            onChange={(e) => setNewItemCategory(e.target.value)}
+                                            className="bg-white text-[#6A0DAD] border-[#6A0DAD]"
+                                        />
                                         <Button
                                             onClick={handleAddToRegistry}
                                             className="w-full bg-[#6A0DAD] text-white hover:bg-[#FFD700] hover:text-[#6A0DAD]"
                                         >
-                                            Add to Registry
+                                            {editItemId ? "Update Item" : "Add to Registry"}
                                         </Button>
                                     </div>
                                 </DialogContent>
@@ -429,14 +628,32 @@ const HostDashboard = ({ eventInfo, giftRegistry }: GiftManagementProps) => {
                                         </div>
                                         <CardContent className="p-4">
                                             <h3 className="font-semibold mb-2 text-[#6A0DAD]">{item.name}</h3>
-                                            <p className="text-sm text-[#6A0DAD]/70 mb-2">
-                                                {item.description}
-                                            </p>
+                                            <p className="text-sm text-[#6A0DAD]/70 mb-2">{item.description}</p>
+                                            <p className="text-sm text-[#6A0DAD]/70 mb-2">Category: {item.category}</p>
                                             <div className="flex items-center justify-between">
                                                 <span className="text-lg font-bold text-[#FFD700]">
                                                     KSh {item.price.toLocaleString()}
                                                 </span>
                                                 <Badge className="bg-[#6A0DAD] text-white">{item.vendor}</Badge>
+                                            </div>
+                                            <div className="flex gap-2 mt-4">
+                                                <Button
+                                                    size="sm"
+                                                    onClick={() => handleEditRegistryItem(item)}
+                                                    className="bg-[#6A0DAD] text-white hover:bg-[#FFD700] hover:text-[#6A0DAD]"
+                                                >
+                                                    <Edit className="w-4 h-4 mr-1" />
+                                                    Edit
+                                                </Button>
+                                                <Button
+                                                    size="sm"
+                                                    variant="destructive"
+                                                    onClick={() => handleDeleteRegistryItem(item.id)}
+                                                    className="bg-red-600 text-white hover:bg-red-700"
+                                                >
+                                                    <Trash className="w-4 h-4 mr-1" />
+                                                    Delete
+                                                </Button>
                                             </div>
                                         </CardContent>
                                     </Card>

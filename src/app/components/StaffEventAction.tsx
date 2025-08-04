@@ -1,7 +1,8 @@
 import { StaffEventActionsProps } from "@/lib/types";
 import { motion } from "framer-motion";
+import { FaGift } from "react-icons/fa";
 import { FiEdit, FiTrash2, FiUsers } from "react-icons/fi";
-import { MdOutlineEventNote } from "react-icons/md";
+import { MdFactCheck, MdOutlineEventNote } from "react-icons/md";
 
 export function StaffEventActions({
     isStaff,
@@ -11,6 +12,8 @@ export function StaffEventActions({
     handleManageRsvps,
     handleManageTickets,
     handleSendEventLink,
+    handleGiftManagement,
+    handleCheckin,
 }: StaffEventActionsProps) {
     if (!isStaff) return null;
 
@@ -72,12 +75,32 @@ export function StaffEventActions({
                 <motion.button
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
+                    onClick={handleCheckin}
+                    className="px-4 py-2 rounded text-white flex items-center gap-2"
+                    style={{ backgroundColor: event.primaryColor, color: event.secondaryColor }}
+                    aria-label="Check In"
+                >
+                    <MdFactCheck /> Check In
+                </motion.button>
+                <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
                     onClick={() => window.location.href = `/events/${event.id}/analytics`}
                     className="px-4 py-2 rounded bg-gray-500 text-white flex items-center gap-2"
                     style={{ backgroundColor: event.primaryColor, color: event.secondaryColor }}
                     aria-label="View Analytics"
                 >
                     <FiUsers /> View Analytics
+                </motion.button>
+                <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={handleGiftManagement}
+                    className="px-4 py-2 rounded text-white flex items-center gap-2"
+                    style={{ backgroundColor: event.primaryColor, color: event.secondaryColor }}
+                    aria-label="View Analytics"
+                >
+                    <FaGift /> Manage Gifts
                 </motion.button>
             </div>
         </div>

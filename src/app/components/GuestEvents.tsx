@@ -160,8 +160,8 @@ export default function EventPage() {
     }
 
     const handleRsvp = () => router.push(`/event-management/${eventId}/guest-event/guest-rsvp`);
-
     const handleTickets = () => router.push(`/event-management/${eventId}/guest-event/guest-ticket`)
+    const handleGifts = () => router.push(`/event-management/${eventId}/guest-event/guest-gift`)
 
     return (
         <div
@@ -181,7 +181,9 @@ export default function EventPage() {
             <GuestActions 
             event={event} 
             handleGuestRsvp={handleRsvp} 
-            handleBuyTickets={handleTickets} />
+            handleBuyTickets={handleTickets}
+            handleGifts={handleGifts}
+            />
         </div>
     );
 }

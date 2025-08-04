@@ -10,7 +10,7 @@ import { storage } from '@/lib/firebase';
 import { EventDetail, GiftManagementProps, ReceivedGift, RegistryItem } from '@/lib/types';
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import { motion } from 'framer-motion';
-import { Badge, Check, DollarSign, Download, Edit, Gift, Heart, MapPin, Package, Plus, Trash } from 'lucide-react';
+import { Badge, Bell, Check, DollarSign, Download, Edit, Gift, Heart, MapPin, Package, Plus, Trash } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import React, { useEffect, useState } from 'react'
 import toast from 'react-hot-toast';
@@ -32,6 +32,12 @@ const HostDashboard = ({ eventInfo, giftRegistry }: GiftManagementProps) => {
     const [newItemCategory, setNewItemCategory] = useState("");
     const [editItemId, setEditItemId] = useState<string | null>(null);
     const [registry, setRegistry] = useState<RegistryItem[]>([])
+    const [notificationPreferences, setNotificationPreferences] = useState({
+        email: true,
+        sms: false,
+        push: true,
+    });
+    const [customDeliveryAddress, setCustomDeliveryAddress] = useState("");
 
     const fetchEvent = async () => {
         try {
@@ -63,7 +69,12 @@ const HostDashboard = ({ eventInfo, giftRegistry }: GiftManagementProps) => {
             }
             const registryItems = await response.json();
             console.log("Fetched registry items:", registryItems);
-            setRegistry(registryItems);
+            // Ensure all items have a valid price
+            const sanitizedItems = registryItems.map((item: RegistryItem) => ({
+                ...item,
+                price: typeof item.price === 'number' ? item.price : 0, // Default to 0 if price is undefined
+            }));
+            setRegistry(sanitizedItems);
         } catch (error: any) {
             console.error("Error fetching registry items:", error.message);
             toast.error(error.message);
@@ -72,9 +83,31 @@ const HostDashboard = ({ eventInfo, giftRegistry }: GiftManagementProps) => {
         }
     };
 
+    const fetchUserPreferences = async () => {
+        try {
+            const response = await fetch(`/api/preferences/${eventId}`);
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(`Failed to fetch preferences: ${errorData.error || 'Unknown error'}`);
+            }
+            const data = await response.json();
+            setDeliveryLocation(data.deliveryLocation || 'event-venue');
+            setCustomDeliveryAddress(data.customDeliveryAddress || '');
+            setNotificationPreferences({
+                email: data.notificationPreferences?.email ?? true,
+                sms: data.notificationPreferences?.sms ?? false,
+                push: data.notificationPreferences?.push ?? true,
+            });
+        } catch (error: any) {
+            console.error("Error fetching user preferences:", error.message);
+            toast.error("Failed to load preferences");
+        }
+    };
+
     useEffect(() => {
         fetchEvent()
         fetchRegistry()
+        fetchUserPreferences()
     }, [])
 
     // Mock data
@@ -145,8 +178,8 @@ const HostDashboard = ({ eventInfo, giftRegistry }: GiftManagementProps) => {
 
     const handleAddToRegistry = async () => {
         if (!newItemName || !newItemDescription || !newItemPrice) {
-            toast.error("Please fill all required fields")
-            return
+            toast.error("Please fill all required fields");
+            return;
         }
 
         let imageUrl = "https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=300&h=300&fit=crop";
@@ -177,7 +210,7 @@ const HostDashboard = ({ eventInfo, giftRegistry }: GiftManagementProps) => {
         try {
             const endpoint = editItemId ? `/api/registry/item/${editItemId}` : '/api/registry';
             const method = editItemId ? 'PATCH' : 'POST';
-            console.log("Sending request to:", endpoint, "Method:", method, "Data:", registryData); // Debug log
+            console.log("Sending request to:", endpoint, "Method:", method, "Data:", registryData);
             const response = await fetch(endpoint, {
                 method,
                 headers: { 'Content-Type': 'application/json' },
@@ -185,15 +218,14 @@ const HostDashboard = ({ eventInfo, giftRegistry }: GiftManagementProps) => {
             });
             if (!response.ok) {
                 const errorData = await response.json();
-                console.error("API Error:", errorData); // Debug log
+                console.error("API Error:", errorData);
                 throw new Error(`Failed to ${editItemId ? 'update' : 'add'} registry item: ${errorData.error || 'Unknown error'}`);
             }
-            const updatedItem = await response.json();
-            if (editItemId) {
-                setRegistry((prev) => prev.map(item => item.id === editItemId ? updatedItem : item));
-            } else {
-                setRegistry((prev) => [...prev, updatedItem]);
-            }
+
+            // Refetch the registry to ensure the UI reflects the latest server state
+            await fetchRegistry();
+
+            // Clear form fields
             setNewItemName("");
             setNewItemDescription("");
             setNewItemPrice("");
@@ -299,10 +331,33 @@ const HostDashboard = ({ eventInfo, giftRegistry }: GiftManagementProps) => {
         console.log("Adding vendor product to registry:", product);
     };
 
+    const handleSavePreferences = async () => {
+        try {
+            const preferences = {
+                deliveryLocation,
+                customDeliveryAddress: deliveryLocation === 'custom' ? customDeliveryAddress : '',
+                notificationPreferences,
+            };
+            const response = await fetch(`/api/preferences/${eventId}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(preferences),
+            });
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(`Failed to save preferences: ${errorData.error || 'Unknown error'}`);
+            }
+            toast.success("Preferences saved successfully");
+        } catch (error: any) {
+            console.error("Error saving preferences:", error.message);
+            toast.error("Failed to save preferences");
+        }
+    };
+
     const stats = {
         totalGifts: giftRegistry.length,
         totalValue: giftRegistry.reduce((sum, gift) => sum + gift.price, 0),
-        availableGifts: giftRegistry.filter(gift => gift.available).length,
+        availableGifts: giftRegistry.filter(gift => gift.received).length,
         categories: Array.from(new Set(giftRegistry.map(gift => gift.category))).length
     }
 
@@ -327,7 +382,7 @@ const HostDashboard = ({ eventInfo, giftRegistry }: GiftManagementProps) => {
     };
 
     return (
-        <div className="my-24 min-h-screen bg-[rgba(255,215,0,0.2)] backdrop-blur-md w-2/3">
+        <div className="my-24 rounded-lg min-h-screen bg-[rgba(255,215,0,0.2)] backdrop-blur-md w-2/3 shadow-[0_4px_12px_rgba(106,13,173,0.7)]">
             <div className="container mx-auto px-4 py-8">
                 <motion.div
                     initial={{ opacity: 0, y: -20 }}
@@ -601,65 +656,69 @@ const HostDashboard = ({ eventInfo, giftRegistry }: GiftManagementProps) => {
                             </Dialog>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {registry.map((item, index) => (
-                                <motion.div
-                                    key={item.id}
-                                    initial={{ opacity: 0, y: 20 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    transition={{ delay: index * 0.1 }}
-                                    variants={formVariants}
-                                >
-                                    <Card className={`relative bg-[rgba(255,215,0,0.2)] backdrop-blur-md shadow-[0_4px_12px_rgba(106,13,173,0.3)] ${item.received ? 'opacity-75' : ''}`}>
-                                        {item.received && (
-                                            <div className="absolute top-2 right-2 z-10">
-                                                <Badge className="bg-[#6A0DAD] text-white">
-                                                    <Check className="w-3 h-3 mr-1" />
-                                                    Received
-                                                </Badge>
+                        {loading ? (
+                            <div className="text-center text-[#6A0DAD]">Loading registry...</div>
+                        ) : (
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                {registry.map((item, index) => (
+                                    <motion.div
+                                        key={item.id}
+                                        initial={{ opacity: 0, y: 20 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        transition={{ delay: index * 0.1 }}
+                                        variants={formVariants}
+                                    >
+                                        <Card className={`relative bg-[rgba(255,215,0,0.2)] backdrop-blur-md shadow-[0_4px_12px_rgba(106,13,173,0.3)] ${item.received ? 'opacity-75' : ''}`}>
+                                            {item.received && (
+                                                <div className="absolute top-2 right-2 z-10">
+                                                    <Badge className="bg-[#6A0DAD] text-white">
+                                                        <Check className="w-3 h-3 mr-1" />
+                                                        Received
+                                                    </Badge>
+                                                </div>
+                                            )}
+                                            <div className="aspect-square overflow-hidden rounded-t-lg">
+                                                <img
+                                                    src={item.image}
+                                                    alt={item.name}
+                                                    className="w-full h-full object-cover"
+                                                />
                                             </div>
-                                        )}
-                                        <div className="aspect-square overflow-hidden rounded-t-lg">
-                                            <img
-                                                src={item.image}
-                                                alt={item.name}
-                                                className="w-full h-full object-cover"
-                                            />
-                                        </div>
-                                        <CardContent className="p-4">
-                                            <h3 className="font-semibold mb-2 text-[#6A0DAD]">{item.name}</h3>
-                                            <p className="text-sm text-[#6A0DAD]/70 mb-2">{item.description}</p>
-                                            <p className="text-sm text-[#6A0DAD]/70 mb-2">Category: {item.category}</p>
-                                            <div className="flex items-center justify-between">
-                                                <span className="text-lg font-bold text-[#FFD700]">
-                                                    KSh {item.price.toLocaleString()}
-                                                </span>
-                                                <Badge className="bg-[#6A0DAD] text-white">{item.vendor}</Badge>
-                                            </div>
-                                            <div className="flex gap-2 mt-4">
-                                                <Button
-                                                    size="sm"
-                                                    onClick={() => handleEditRegistryItem(item)}
-                                                    className="bg-[#6A0DAD] text-white hover:bg-[#FFD700] hover:text-[#6A0DAD]"
-                                                >
-                                                    <Edit className="w-4 h-4 mr-1" />
-                                                    Edit
-                                                </Button>
-                                                <Button
-                                                    size="sm"
-                                                    variant="destructive"
-                                                    onClick={() => handleDeleteRegistryItem(item.id)}
-                                                    className="bg-red-600 text-white hover:bg-red-700"
-                                                >
-                                                    <Trash className="w-4 h-4 mr-1" />
-                                                    Delete
-                                                </Button>
-                                            </div>
-                                        </CardContent>
-                                    </Card>
-                                </motion.div>
-                            ))}
-                        </div>
+                                            <CardContent className="p-4">
+                                                <h3 className="font-semibold mb-2 text-[#6A0DAD]">{item.name}</h3>
+                                                <p className="text-sm text-[#6A0DAD]/70 mb-2">{item.description}</p>
+                                                <p className="text-sm text-[#6A0DAD]/70 mb-2">Category: {item.category}</p>
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-lg font-bold text-[#FFD700]">
+                                                        KSh {typeof item.price === 'number' ? item.price.toLocaleString() : 'N/A'}
+                                                    </span>
+                                                    <Badge className="bg-[#6A0DAD] text-white">{item.vendor}</Badge>
+                                                </div>
+                                                <div className="flex gap-2 mt-4">
+                                                    <Button
+                                                        size="sm"
+                                                        onClick={() => handleEditRegistryItem(item)}
+                                                        className="bg-[#6A0DAD] text-white hover:bg-[#FFD700] hover:text-[#6A0DAD]"
+                                                    >
+                                                        <Edit className="w-4 h-4 mr-1" />
+                                                        Edit
+                                                    </Button>
+                                                    <Button
+                                                        size="sm"
+                                                        variant="destructive"
+                                                        onClick={() => handleDeleteRegistryItem(item.id)}
+                                                        className="bg-red-600 text-white hover:bg-red-700"
+                                                    >
+                                                        <Trash className="w-4 h-4 mr-1" />
+                                                        Delete
+                                                    </Button>
+                                                </div>
+                                            </CardContent>
+                                        </Card>
+                                    </motion.div>
+                                ))}
+                            </div>
+                        )}
                     </TabsContent>
 
                     <TabsContent value="settings" className="space-y-6">
@@ -679,11 +738,67 @@ const HostDashboard = ({ eventInfo, giftRegistry }: GiftManagementProps) => {
                                         className="w-full p-2 border border-[#6A0DAD] rounded-md bg-white text-[#6A0DAD]"
                                     >
                                         <option value="event-venue">Event Venue</option>
-                                        <option value="home">Home Address</option>
-                                        <option value="office">Office Address</option>
+                                        <option value="nairobi-warehouse">Nairobi Warehouse</option>
+                                        <option value="mombasa-depot">Mombasa Depot</option>
+                                        <option value="kisumu-hub">Kisumu Hub</option>
+                                        <option value="custom">Custom Address</option>
                                     </select>
                                 </div>
-                                <Button className="bg-[#6A0DAD] text-white hover:bg-[#FFD700] hover:text-[#6A0DAD]">
+                                {deliveryLocation === 'custom' && (
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium text-[#6A0DAD]">Custom Delivery Address</label>
+                                        <Textarea
+                                            placeholder="Enter custom delivery address"
+                                            value={customDeliveryAddress}
+                                            onChange={(e) => setCustomDeliveryAddress(e.target.value)}
+                                            className="bg-white text-[#6A0DAD] border-[#6A0DAD]"
+                                        />
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
+
+                        <Card className="bg-[rgba(255,215,0,0.2)] backdrop-blur-md shadow-[0_4px_12px_rgba(106,13,173,0.3)]">
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2 text-[#6A0DAD]">
+                                    <Bell className="w-5 h-5" />
+                                    Notification Preferences
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                <div className="space-y-2">
+                                    <label className="flex items-center gap-2 text-sm font-medium text-[#6A0DAD]">
+                                        <input
+                                            type="checkbox"
+                                            checked={notificationPreferences.email}
+                                            onChange={(e) => setNotificationPreferences(prev => ({ ...prev, email: e.target.checked }))}
+                                            className="h-4 w-4 text-[#6A0DAD] border-[#6A0DAD]"
+                                        />
+                                        Email Notifications
+                                    </label>
+                                    <label className="flex items-center gap-2 text-sm font-medium text-[#6A0DAD]">
+                                        <input
+                                            type="checkbox"
+                                            checked={notificationPreferences.sms}
+                                            onChange={(e) => setNotificationPreferences(prev => ({ ...prev, sms: e.target.checked }))}
+                                            className="h-4 w-4 text-[#6A0DAD] border-[#6A0DAD]"
+                                        />
+                                        SMS Notifications
+                                    </label>
+                                    <label className="flex items-center gap-2 text-sm font-medium text-[#6A0DAD]">
+                                        <input
+                                            type="checkbox"
+                                            checked={notificationPreferences.push}
+                                            onChange={(e) => setNotificationPreferences(prev => ({ ...prev, push: e.target.checked }))}
+                                            className="h-4 w-4 text-[#6A0DAD] border-[#6A0DAD]"
+                                        />
+                                        Push Notifications
+                                    </label>
+                                </div>
+                                <Button
+                                    onClick={handleSavePreferences}
+                                    className="bg-[#6A0DAD] text-white hover:bg-[#FFD700] hover:text-[#6A0DAD]"
+                                >
                                     Save Preferences
                                 </Button>
                             </CardContent>

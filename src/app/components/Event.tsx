@@ -91,6 +91,8 @@ export default function EventPage() {
     const handleManageRsvps = () => router.push(`/event-management/${eventId}/rsvps`);
     const handleManageTickets = () => router.push(`/event-management/${eventId}/tickets`);
     const handleSendEventLink = () => router.push(`/event-management/${eventId}/guest-event`);
+    const handleGiftManagement = () => router.push(`/event-management/${eventId}/gifts`);
+    const handleCheckin = () => router.push(`/event-management/${eventId}/check-in`);
 
     const handleAddToCalendar = () => {
         if (!event) return;
@@ -228,6 +230,8 @@ export default function EventPage() {
                 handleManageRsvps={handleManageRsvps}
                 handleManageTickets={handleManageTickets}
                 handleSendEventLink={handleSendEventLink}
+                handleGiftManagement={handleGiftManagement}
+                handleCheckin={handleCheckin}
             />
         </div>
     );

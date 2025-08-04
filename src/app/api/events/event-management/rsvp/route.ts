@@ -20,10 +20,11 @@ export async function POST(request: Request) {
             createdAt: Timestamp.now()
         }
 
-        await addDoc(collection(db, "rsvp"), rsvpData);
+        const docRef = await addDoc(collection(db, "rsvp"), rsvpData);
 
         return NextResponse.json({
-            message: "RSVP Successful"
+            message: "RSVP Successful",
+            rsvpId: docRef.id
         }, { status: 201 })
     } catch (error: any) {
         console.error("RSVP error:", error.message);

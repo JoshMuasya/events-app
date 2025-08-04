@@ -265,12 +265,15 @@ export interface StaffEventActionsProps {
   handleManageRsvps: () => void;
   handleManageTickets: () => void;
   handleSendEventLink: () => void;
+  handleGiftManagement: () => void;
+  handleCheckin: () => void;
 }
 
 export interface GuestEventActionsProps {
   event: EventDetail;
   handleGuestRsvp: () => void;
   handleBuyTickets: () => void;
+  handleGifts: () => void;
 }
 
 export type StaffOption = {
@@ -352,7 +355,7 @@ export interface GiftItem {
   image: string;
   vendor: string;
   category: string;
-  available: boolean;
+  received: boolean;
 }
 
 export interface GiftCardProps {
@@ -370,7 +373,7 @@ export interface GiftItem {
   image: string;
   vendor: string;
   category: string;
-  available: boolean;
+  received: boolean;
 }
 
 export interface EventInfo {
@@ -383,8 +386,7 @@ export interface EventInfo {
 
 export interface GuestGiftFlowProps {
   eventName: string;
-  hostName: string;
-  giftRegistry: GiftItem[];
+  giftRegistry: RegistryItem[];
 }
 
 export interface ReceivedGift {
@@ -440,8 +442,7 @@ export interface VendorCatalogProps {
 }
 
 export interface GuestGiftManagementProps {
-  eventInfo: EventInfo
-  giftRegistry: GiftItem[]
+  giftRegistry: RegistryItem[]
 }
 
 export interface GiftManagementProps {

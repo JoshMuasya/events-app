@@ -4,10 +4,12 @@ import { EventDetail } from '@/lib/types';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { motion } from 'framer-motion'
 import { useParams } from 'next/navigation';
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import { useForm } from 'react-hook-form';
 import toast from 'react-hot-toast';
 import z from 'zod';
+import QRCode from 'qrcode';
+import { jsPDF } from 'jspdf';
 
 const rsvpSchema = z.object({
     fullName: z.string().min(1, "Name is required"),
@@ -21,6 +23,9 @@ const GuestRsvp = () => {
     const [error, setError] = useState<string | null>(null);
     const [event, setEvent] = useState<EventDetail>()
     const [loading, setLoading] = useState(false)
+    const [qrCodeUrl, setQrCodeUrl] = useState<string | null>(null)
+    const [rsvpId, setRsvpId] = useState<string | null>(null)
+    const qrCodeRef = useRef<HTMLCanvasElement>(null)
     const { eventId } = useParams()
 
     const fetchEvent = async () => {
@@ -69,12 +74,37 @@ const GuestRsvp = () => {
         resolver: zodResolver(rsvpSchema),
     })
 
+    const generateQRCode = async (rsvpId: string) => {
+        try {
+            const qrCodeDataUrl = await QRCode.toDataURL(rsvpId, {
+                width: 200,
+                margin: 2,
+            })
+            setQrCodeUrl(qrCodeDataUrl)
+        } catch (err) {
+            console.error('Failed to generate QR code:', err)
+            toast.error('Failed to generate QR code')
+        }
+    }
+
+    const downloadPDF = () => {
+        if (qrCodeUrl && event) {
+            const doc = new jsPDF()
+            doc.setFontSize(20)
+            doc.text(`RSVP Confirmation for ${event.eventName}`, 20, 20)
+            doc.setFontSize(12)
+            doc.text(`RSVP ID: ${rsvpId}`, 20, 30)
+            doc.addImage(qrCodeUrl, 'PNG', 20, 40, 80, 80)
+            doc.save(`rsvp-${rsvpId}.pdf`)
+        }
+    }
+
     const onSubmit = async (data: FormData) => {
         try {
             const response = await fetch("/api/events/event-management/rsvp", {
                 method: "POST",
                 headers: {
-                    "Context-type": "application/json"
+                    "Content-type": "application/json"
                 },
                 body: JSON.stringify({
                     eventId: eventId,
@@ -84,11 +114,19 @@ const GuestRsvp = () => {
                 })
             })
 
-            toast.success("RSVP Successful");
-            reset();
+            const responseData = await response.json()
+            
+            if (response.ok) {
+                toast.success("RSVP Successful")
+                setRsvpId(responseData.rsvpId)
+                await generateQRCode(responseData.rsvpId)
+                reset()
+            } else {
+                throw new Error(responseData.error || "Failed to RSVP")
+            }
         } catch (err) {
-            toast.error("Failed to RSVP. Try again");
-            setError(err instanceof Error ? err.message : "Failed to create speaker");
+            toast.error("Failed to RSVP. Try again")
+            setError(err instanceof Error ? err.message : "Failed to create RSVP")
         }
     }
 
@@ -160,11 +198,24 @@ const GuestRsvp = () => {
                     <button
                         type="submit"
                         className="btn bg-[#6A0DAD] text-white hover:bg-[#FFD700] hover:text-[#6A0DAD] mt-4"
-                        aria-label="Submit new speaker"
+                        aria-label="Submit RSVP"
                     >
                         RSVP
                     </button>
                 </form>
+                {qrCodeUrl && (
+                    <div className="mt-6 text-center">
+                        <h4 className="text-md font-medium mb-2">Your RSVP QR Code</h4>
+                        <img src={qrCodeUrl} alt="RSVP QR Code" className="mx-auto mb-4" />
+                        <button
+                            onClick={downloadPDF}
+                            className="btn bg-[#6A0DAD] text-white hover:bg-[#FFD700] hover:text-[#6A0DAD]"
+                            aria-label="Download QR Code as PDF"
+                        >
+                            Download QR Code PDF
+                        </button>
+                    </div>
+                )}
             </motion.div>
         </div>
     )

@@ -5,15 +5,28 @@ import { Input } from '@/components/ui/input';
 import { GiftItem, GuestGiftFlowProps } from '@/lib/types';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Badge, Building, CreditCard, Gift, MessageSquare, Search, Smartphone } from 'lucide-react';
-import React, { useState } from 'react'
+import React, { useState } from 'react';
 import toast from 'react-hot-toast';
 import GiftCard from './GiftCard';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Label } from 'recharts';
 import { Switch } from '@/components/ui/switch';
+import { v4 as uuidv4 } from 'uuid';
+import { doc, setDoc, addDoc, collection } from 'firebase/firestore';
+import { db } from '@/lib/firebase'; // Adjust path to your Firebase config
 
-const GuestGiftFlow = ({ eventName, hostName, giftRegistry }: GuestGiftFlowProps) => {
+interface PurchasedGift extends GiftItem {
+  transactionId: string;
+  message: string;
+  isAnonymous: boolean;
+  purchaseDate: string;
+}
+
+interface ExtendedGuestGiftFlowProps extends GuestGiftFlowProps {
+  eventId: string;
+}
+
+const GuestGiftFlow = ({ eventName, eventId, giftRegistry }: ExtendedGuestGiftFlowProps) => {
   const [selectedGift, setSelectedGift] = useState<GiftItem | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
@@ -21,14 +34,16 @@ const GuestGiftFlow = ({ eventName, hostName, giftRegistry }: GuestGiftFlowProps
   const [isAnonymous, setIsAnonymous] = useState(false);
   const [currentStep, setCurrentStep] = useState<"browse" | "checkout" | "complete">("browse");
   const [wishlist, setWishlist] = useState<string[]>([]);
+  const [availableGifts, setAvailableGifts] = useState<GiftItem[]>(giftRegistry);
+  const [purchasedGifts, setPurchasedGifts] = useState<PurchasedGift[]>([]);
 
-  const categories = ["all", ...Array.from(new Set(giftRegistry.map((gift: { category: any; }) => gift.category)))];
+  const categories = ["all", ...Array.from(new Set(availableGifts.map(gift => gift.category)))];
 
-  const filteredGifts = giftRegistry.filter(gift => {
+  const filteredGifts = availableGifts.filter(gift => {
     const matchesSearch = gift.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         gift.description.toLowerCase().includes(searchQuery.toLowerCase());
+      gift.description.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory = selectedCategory === "all" || gift.category === selectedCategory;
-    return matchesSearch && matchesCategory;
+    return matchesSearch && matchesCategory && !gift.received;
   });
 
   const handleGiftSelect = (gift: GiftItem) => {
@@ -37,18 +52,50 @@ const GuestGiftFlow = ({ eventName, hostName, giftRegistry }: GuestGiftFlowProps
   };
 
   const toggleWishlist = (gift: GiftItem) => {
-    setWishlist(prev => 
-      prev.includes(gift.id) 
+    setWishlist(prev =>
+      prev.includes(gift.id)
         ? prev.filter(id => id !== gift.id)
         : [...prev, gift.id]
     );
   };
 
-  const handlePurchase = (paymentMethod: string) => {
+  const handlePurchase = async (paymentMethod: string) => {
+    if (!selectedGift) return;
+
     // Simulate purchase process
-    setTimeout(() => {
-      setCurrentStep("complete");
-      toast(`Gift Purchase Successful! 🎁Your gift for ${hostName} has been purchased successfully.`,);
+    setTimeout(async () => {
+      try {
+        const transactionId = uuidv4();
+        const purchasedGift: PurchasedGift = {
+          ...selectedGift,
+          transactionId,
+          message,
+          isAnonymous,
+          purchaseDate: new Date().toISOString(),
+        };
+
+        // Update gift's received status in Firestore
+        const giftRef = doc(db, `events/${eventId}/registry`, selectedGift.id);
+        await setDoc(giftRef, { received: true }, { merge: true });
+
+        // Add to purchased gifts in Firestore
+        await addDoc(collection(db, `events/${eventId}/gifts`), purchasedGift);
+
+        // Update local state
+        setAvailableGifts(prev => prev.filter(gift => gift.id !== selectedGift.id));
+        setPurchasedGifts(prev => [...prev, purchasedGift]);
+
+        // Clear checkout state
+        setSelectedGift(null);
+        setMessage("");
+        setIsAnonymous(false);
+
+        setCurrentStep("complete");
+        toast(`Gift Purchase Successful! 🎁 Your gift has been purchased successfully.`);
+      } catch (error) {
+        console.error("Error processing purchase:", error);
+        toast.error("Failed to process purchase. Please try again.");
+      }
     }, 2000);
   };
 
@@ -65,7 +112,7 @@ const GuestGiftFlow = ({ eventName, hostName, giftRegistry }: GuestGiftFlowProps
             Gift Registry
           </h1>
           <p className="text-muted-foreground">
-            Choose a perfect gift for <span className="text-gold font-semibold">{hostName}</span>'s {eventName}
+            Choose a perfect gift for {eventName}
           </p>
         </motion.div>
 
@@ -95,11 +142,10 @@ const GuestGiftFlow = ({ eventName, hostName, giftRegistry }: GuestGiftFlowProps
                       {categories.map((category) => (
                         <Badge
                           key={category}
-                          className={`cursor-pointer whitespace-nowrap ${
-                            selectedCategory === category 
-                              ? "bg-primary text-primary-foreground" 
+                          className={`cursor-pointer whitespace-nowrap ${selectedCategory === category
+                              ? "bg-primary text-primary-foreground"
                               : "hover:bg-primary/10"
-                          }`}
+                            }`}
                           onClick={() => setSelectedCategory(category)}
                         >
                           {category.charAt(0).toUpperCase() + category.slice(1)}
@@ -184,7 +230,9 @@ const GuestGiftFlow = ({ eventName, hostName, giftRegistry }: GuestGiftFlowProps
                       checked={isAnonymous}
                       onCheckedChange={setIsAnonymous}
                     />
-                    <Label>Send gift anonymously</Label>
+                    <label htmlFor="anonymous" className="text-sm text-muted-foreground">
+                      Send gift anonymously
+                    </label>
                   </div>
                 </CardContent>
               </Card>
@@ -231,7 +279,7 @@ const GuestGiftFlow = ({ eventName, hostName, giftRegistry }: GuestGiftFlowProps
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.9 }}
-              className="max-w-md mx-auto text-center"
+              className="max-w-2xl mx-auto space-y-6"
             >
               <Card>
                 <CardContent className="p-8 space-y-6">
@@ -249,17 +297,62 @@ const GuestGiftFlow = ({ eventName, hostName, giftRegistry }: GuestGiftFlowProps
                       Gift Sent Successfully! 🎉
                     </h2>
                     <p className="text-muted-foreground">
-                      Your gift for {hostName} has been purchased and will be delivered to the event venue.
+                      Your gift has been purchased and will be delivered to the event venue.
                     </p>
                   </div>
-                  <Button
-                    onClick={() => setCurrentStep("browse")}
-                    className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
-                  >
-                    Send Another Gift
-                  </Button>
                 </CardContent>
               </Card>
+
+              {/* Gift Table */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Gift className="w-5 h-5 text-gold" />
+                    Purchased Gifts
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {purchasedGifts.length === 0 ? (
+                    <p className="text-muted-foreground">No gifts purchased yet.</p>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left">
+                        <thead>
+                          <tr className="border-b text-muted-foreground">
+                            <th className="py-2 px-4">Transaction ID</th>
+                            <th className="py-2 px-4">Gift Name</th>
+                            <th className="py-2 px-4">Price (KSh)</th>
+                            <th className="py-2 px-4">Message</th>
+                            <th className="py-2 px-4">Anonymous</th>
+                            <th className="py-2 px-4">Purchase Date</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {purchasedGifts.map((gift) => (
+                            <tr key={gift.transactionId} className="border-b">
+                              <td className="py-2 px-4">{gift.transactionId}</td>
+                              <td className="py-2 px-4">{gift.name}</td>
+                              <td className="py-2 px-4">{gift.price.toLocaleString()}</td>
+                              <td className="py-2 px-4">{gift.message || "No message"}</td>
+                              <td className="py-2 px-4">{gift.isAnonymous ? "Yes" : "No"}</td>
+                              <td className="py-2 px-4">
+                                {new Date(gift.purchaseDate).toLocaleDateString()}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Button
+                onClick={() => setCurrentStep("browse")}
+                className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
+              >
+                Send Another Gift
+              </Button>
             </motion.div>
           )}
         </AnimatePresence>

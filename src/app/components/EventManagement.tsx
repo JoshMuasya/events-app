@@ -1377,13 +1377,6 @@ export default function EventManagement() {
                   >
                     Analytics
                   </Link>
-                  <button
-                    className="btn btn-sm bg-[#6A0DAD] text-white hover:bg-[#FFD700] hover:text-[#6A0DAD]"
-                    onClick={() => toast.success("Promote functionality coming soon!")}
-                    aria-label={`Promote ${event.eventName}`}
-                  >
-                    Promote
-                  </button>
                 </div>
                 <div className="flex gap-2">
                   <button
@@ -1444,8 +1437,8 @@ export default function EventManagement() {
               key={page}
               onClick={() => setCurrentPage(page)}
               className={`btn ${currentPage === page
-                  ? "bg-[#FFD700] text-[#6A0DAD]"
-                  : "bg-[#6A0DAD] text-white hover:bg-[#FFD700] hover:text-[#6A0DAD]"
+                ? "bg-[#FFD700] text-[#6A0DAD]"
+                : "bg-[#6A0DAD] text-white hover:bg-[#FFD700] hover:text-[#6A0DAD]"
                 }`}
               aria-label={`Go to page ${page}`}
             >

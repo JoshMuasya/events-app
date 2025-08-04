@@ -1,22 +1,51 @@
+"use client"
+
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { motion } from 'framer-motion'
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import VendorCatalog from './VendorCatalog'
 import GuestGiftFlow from './GuestGiftFlow'
 import { Gift, Heart, ShoppingBag, Store, TrendingUp } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
-import { GuestGiftManagementProps } from '@/lib/types'
+import { EventDetail, GuestGiftManagementProps } from '@/lib/types'
+import { useParams } from 'next/navigation'
+import toast from 'react-hot-toast'
 
 const GiftManagementGuest = ({
-    eventInfo,
     giftRegistry
 }: GuestGiftManagementProps) => {
+    const [loding, setLoading] = useState(false);
+    const [event, setEvent] = useState<EventDetail | null>(null)
+    const params = useParams()
+    const eventId = params.eventId as string;
+
     const stats = {
         totalGifts: giftRegistry.length,
-        totalValue: giftRegistry.reduce((sum, gift) => sum + gift.price, 0),
-        availableGifts: giftRegistry.filter(gift => gift.available).length,
+        availableGifts: giftRegistry.filter(gift => !gift.received).length,
         categories: Array.from(new Set(giftRegistry.map(gift => gift.category))).length
     }
+
+    const fetchEvent = async () => {
+        try {
+            setLoading(true)
+            const response = await fetch(`/api/events/event-management/${eventId}`);
+            if (!response.ok) {
+                throw new Error("Failed to fetch events");
+            }
+
+            const data = await response.json()
+            setEvent(data.event)
+        } catch (error) {
+            console.error("Error fetching Events:", error);
+            toast.error("Failed to load Events");
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    useEffect (() => {
+        fetchEvent()
+    }, [])
 
     const handleVendorProductAdd = (product: any) => {
     // Handle adding vendor product to registry
@@ -44,9 +73,9 @@ const GiftManagementGuest = ({
                                     <Gift className="w-6 h-6 text-primary" />
                                 </div>
                                 <div>
-                                    <h1 className="text-2xl lg:text-3xl font-bold text-primary">{eventInfo.name}</h1>
+                                    <h1 className="text-2xl lg:text-3xl font-bold text-primary">{event?.eventName}</h1>
                                     <p className="text-muted-foreground">
-                                        {eventInfo.type} • {eventInfo.date}
+                                        {event?.category} • {event?.date}
                                     </p>
                                 </div>
                             </div>
@@ -107,10 +136,10 @@ const GiftManagementGuest = ({
 
                     <TabsContent value="registry">
                         <GuestGiftFlow
-                            eventName={eventInfo.name}
-                            hostName={eventInfo.host}
-                            giftRegistry={giftRegistry}
-                        />
+                            eventName={event?.eventName!}
+                            giftRegistry={giftRegistry} 
+                            eventId={eventId}                        
+                            />
                     </TabsContent>
 
                     <TabsContent value="vendors">

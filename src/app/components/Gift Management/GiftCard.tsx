@@ -36,10 +36,10 @@ const GiftCard = ({ gift, onSelect, onWishlist, isWishlisted = false }: GiftCard
                         <Button
                             onClick={() => onSelect(gift)}
                             className="bg-gold text-gold-foreground hover:bg-gold/90"
-                            disabled={!gift.available}
+                            disabled={gift.received}
                         >
                             <ShoppingCart className="w-4 h-4 mr-2" />
-                            {gift.available ? "Select Gift" : "Unavailable"}
+                            {!gift.received ? "Select Gift" : "Unavailable"}
                         </Button>
                     </motion.div>
 

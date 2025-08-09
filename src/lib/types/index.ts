@@ -449,3 +449,12 @@ export interface GiftManagementProps {
   eventInfo: EventInfo
   giftRegistry: GiftItem[]
 }
+
+export interface RsvpDetails {
+  createdAt: string | { seconds: number; nanoseconds: number }; 
+  emailAddress: string; 
+  eventId: string; 
+  fullName: string; 
+  numberofAttendees: string; 
+  documentNumber: string; 
+}
